@@ -1,0 +1,7 @@
+我注意到，在插画页面显示作品是否已保存的功能存在问题，有时标记会被错误的放置于第一个作品上，因此请尝试修复这个问题。
+
+请在 # 中整理、记录以下内容，并根据此内容进行修复：
+- 画师的插画作品URL为`https://www.pixiv.net/users/画师UID/illustrations`
+- 作品位于<div class="sc-e83d358-0 daBOIJ">中，采用ul、li表格结构
+- 每一个li为一个作品，位于<li size="1" offset="0" class="sc-e83d358-2 sc-e83d358-3 sc-64e0b1a1-1 ijXKlM drkqWI">，其中<div radius="4" class="sc-f44a0b30-9 cvPXKv" style="overflow: visible;">标签为缩略图所在，请将已保存的标记至于此div中
+- 作品链接位于<div class="sc-fab8f26d-1 kcKSxC">中的<a class="sc-fab8f26d-6 hOiByN" href="/artworks/作品PID">，其中href参数中的作品PID为识别关键，在eagle中被保存的作品备注为此PID（请结合“按类型保存”、“为多页作品创建子文件夹”功能来判断）

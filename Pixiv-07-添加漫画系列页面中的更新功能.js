@@ -91,8 +91,6 @@ SOFTWARE.
     const SERIES_NAV_BUTTON_SELECTOR = 'div.sc-487e14c9-0.doUXUo'; // 漫画系列"加入追更"按钮 (用于判断是否为漫画系列)
     const MANGA_SERIES_INFO_SELECTOR = 'div.sc-41178ccf-0.fwlXRJ a'; // 漫画系列信息 (用于提取章节序号)
     const MANGA_SERIES_HEADER_SELECTOR = 'div.sc-e4a4c914-0.Hwtke'; // 漫画系列页面头部 (用于插入更新按钮)
-    const ARTWORK_BUTTON_CONTAINER_SELECTOR = 'div.sc-7fd477ff-3.jrRrCf'; // 作品详情页按钮容器
-    const ARTWORK_BUTTON_REF_SELECTOR = 'div.sc-7fd477ff-4.duoqQE'; // 作品详情页按钮插入参考点
 
     // 获取文件夹 ID
     function getFolderId() {
@@ -430,32 +428,7 @@ SOFTWARE.
                     ? data.data.items
                     : [];
 
-                // 1. 快速检查：直接对比列表返回的 url
-                let matched = items.find((item) => item.url === artworkUrl);
-                
-                // 2. 深度检查：如果列表没找到，遍历调用 /api/item/info 获取详细信息对比
-                // (优化：解决列表接口可能返回不完整或缓存数据的问题)
-                if (!matched && items.length > 0) {
-                    const concurrency = 5; // 并发数限制
-                    for (let i = 0; i < items.length; i += concurrency) {
-                        const chunk = items.slice(i, i + concurrency);
-                        const results = await Promise.all(chunk.map(async (item) => {
-                            try {
-                                const infoData = await gmFetch(`http://localhost:41595/api/item/info?id=${item.id}`);
-                                if (infoData && infoData.data && infoData.data.url === artworkUrl) {
-                                    return item;
-                                }
-                            } catch (e) {
-                                // 忽略单个获取失败
-                            }
-                            return null;
-                        }));
-                        
-                        matched = results.find(r => r);
-                        if (matched) break;
-                    }
-                }
-
+                const matched = items.find((item) => item.url === artworkUrl);
                 if (matched) {
                     return {
                         saved: true,
@@ -733,20 +706,8 @@ SOFTWARE.
         try {
             const details = await getArtworkDetails(artworkId);
             const pixivFolderId = getFolderId();
-            
-            let artistFolder = null;
-            try {
-                artistFolder = await findArtistFolder(pixivFolderId, details.userId);
-            } catch (e) {
-                console.error("[Pixiv2Eagle] findArtistFolder 调用失败:", e);
-                return null;
-            }
-            
+            const artistFolder = await findArtistFolder(pixivFolderId, details.userId);
             if (!artistFolder) return null;
-
-            if (getDebugMode()) {
-                console.log(`[Pixiv2Eagle] 开始查找作品: ${artworkId}, 标题: ${details.title}`);
-            }
 
             // 检查当前页面是否为漫画系列（通过"加入追更列表"按钮判断）
             const isSeriesPage = !!document.querySelector(SERIES_NAV_BUTTON_SELECTOR);
@@ -825,88 +786,6 @@ SOFTWARE.
             const savedChild = findInSubfolders(currentFolder);
             if (savedChild) {
                 return { folder: savedChild, itemId: null };
-            }
-
-            // 3. 尝试通过标题在画师文件夹及其子文件夹中搜索 (弥补上述检查可能遗漏的情况)
-            if (details.title) {
-                try {
-                    // 收集画师文件夹及其所有子文件夹的 ID
-                    const allFolderIds = [artistFolder.id];
-                    function collectFolderIds(folder) {
-                        if (folder.children) {
-                            folder.children.forEach(child => {
-                                allFolderIds.push(child.id);
-                                collectFolderIds(child);
-                            });
-                        }
-                    }
-                    collectFolderIds(artistFolder);
-
-                    if (getDebugMode()) {
-                        console.log(`[Pixiv2Eagle] 尝试通过标题搜索: "${details.title}", 搜索范围: ${allFolderIds.length} 个文件夹`);
-                    }
-
-                    const params = new URLSearchParams({
-                        folders: allFolderIds.join(','),
-                        keyword: details.title,
-                        limit: "50"
-                    });
-                    // 注意：Eagle 的 keyword 搜索是模糊匹配
-                    const searchUrl = `http://localhost:41595/api/item/list?${params.toString()}`;
-                    const data = await gmFetch(searchUrl);
-                    
-                    if (data && data.status === "success") {
-                        const items = Array.isArray(data.data) ? data.data : (data.data?.items || []);
-                        const artworkUrl = `https://www.pixiv.net/artworks/${artworkId}`;
-                        
-                        if (getDebugMode()) {
-                            console.log(`[Pixiv2Eagle] 标题搜索结果: 找到 ${items.length} 个项目`);
-                        }
-
-                        // 优先检查 URL 匹配
-                        let matched = items.find(item => item.url === artworkUrl);
-                        
-                        // 如果没有直接匹配，尝试获取详细信息验证 (深度检查)
-                        if (!matched && items.length > 0) {
-                            if (getDebugMode()) {
-                                console.log(`[Pixiv2Eagle] 列表 URL 未匹配，尝试深度检查 ${items.length} 个项目...`);
-                            }
-                            const concurrency = 5;
-                            for (let i = 0; i < items.length; i += concurrency) {
-                                const chunk = items.slice(i, i + concurrency);
-                                const results = await Promise.all(chunk.map(async (item) => {
-                                    try {
-                                        const infoData = await gmFetch(`http://localhost:41595/api/item/info?id=${item.id}`);
-                                        if (infoData && infoData.data && infoData.data.url === artworkUrl) {
-                                            return item;
-                                        }
-                                    } catch (e) { return null; }
-                                    return null;
-                                }));
-                                matched = results.find(r => r);
-                                if (matched) break;
-                            }
-                        }
-
-                        if (matched) {
-                            if (getDebugMode()) {
-                                console.log(`[Pixiv2Eagle] ✅ 通过标题搜索找到已保存作品:`, matched.id);
-                            }
-                            // 注意：这里返回的 folder 可能是 artistFolder，也可能是子文件夹
-                            // 但我们这里只返回 artistFolder 作为上下文，或者我们需要找到它实际所在的文件夹？
-                            // findSavedFolderForArtwork 的返回值主要用于判断 saved=true
-                            // 如果需要精确的 folder 对象，可能需要进一步处理，但目前逻辑似乎只用到了 folder.id 或 folder 对象本身
-                            // 为了安全起见，我们返回 artistFolder，因为我们确定它在画师文件夹树下
-                            return { folder: artistFolder, itemId: matched.id };
-                        } else {
-                            console.log(`[Pixiv2Eagle] ❌ 标题搜索未找到匹配 URL 的作品`);
-                        }
-                    }
-                } catch (err) {
-                    console.error("通过标题搜索失败:", err);
-                }
-            } else {
-                console.log(`[Pixiv2Eagle] ❌ 无法获取作品标题，跳过标题搜索`);
             }
 
             return null;
@@ -1680,104 +1559,6 @@ SOFTWARE.
             }
         } catch (error) {
             console.error("检测保存状态时出错:", error);
-        }
-    }
-
-    // 将作品文件移动到子文件夹
-    async function moveArtworkToSubfolder(artworkId) {
-        const folderId = getFolderId();
-        if (!folderId) {
-            alert("请先设置 Pixiv 文件夹 ID！");
-            return;
-        }
-
-        const eagleStatus = await checkEagle();
-        if (!eagleStatus.running) {
-            alert("Eagle 未启动！");
-            return;
-        }
-
-        // 检查是否启用了子文件夹功能
-        const createSubFolderMode = getCreateSubFolder();
-        if (createSubFolderMode === 'off') {
-            alert("请先启用多页作品子文件夹功能！");
-            return;
-        }
-
-        try {
-            // 1. 获取作品详情
-            const details = await getArtworkDetails(artworkId);
-            if (!details) {
-                alert("无法获取作品详情");
-                return;
-            }
-
-            // 2. 查找作品所在文件夹
-            const savedInfo = await findSavedFolderForArtwork(artworkId);
-            if (!savedInfo || !savedInfo.folder) {
-                alert("未找到作品在 Eagle 中的保存位置");
-                return;
-            }
-
-            const parentFolder = savedInfo.folder;
-
-            // 3. 检查是否需要创建子文件夹（根据 createSubFolder 设置）
-            const shouldCreateSubfolder = 
-                createSubFolderMode === 'always' || 
-                (createSubFolderMode === 'multi-page' && details.pageCount > 1) ||
-                details.illustType === 1; // 漫画始终创建子文件夹
-
-            if (!shouldCreateSubfolder) {
-                alert("根据当前设置，此作品不需要子文件夹");
-                return;
-            }
-
-            // 4. 查找或创建子文件夹
-            let subFolder = null;
-            if (parentFolder.children) {
-                subFolder = parentFolder.children.find(c => c.description === artworkId);
-            }
-
-            if (!subFolder) {
-                // 创建子文件夹
-                const subFolderId = await createEagleFolder(
-                    details.illustTitle,
-                    parentFolder.id,
-                    artworkId
-                );
-                subFolder = { id: subFolderId, name: details.illustTitle };
-                console.log(`[Pixiv2Eagle] 已创建子文件夹: ${details.illustTitle}`);
-            }
-
-            // 5. 获取所有属于该作品的文件
-            const items = await getAllEagleItemsInFolder(parentFolder.id);
-            const artworkUrl = `https://www.pixiv.net/artworks/${artworkId}`;
-            const artworkItems = items.filter(item => item.url === artworkUrl);
-
-            if (artworkItems.length === 0) {
-                alert("未找到需要移动的文件");
-                return;
-            }
-
-            // 6. 移动文件到子文件夹
-            for (const item of artworkItems) {
-                // 修改 folders 属性并保存
-                await gmFetch("http://localhost:41595/api/item/update", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        id: item.id,
-                        folders: [subFolder.id]
-                    })
-                });
-                console.log(`[Pixiv2Eagle] 已移动文件: ${item.name} -> ${subFolder.name}`);
-            }
-
-            alert(`✅ 成功将 ${artworkItems.length} 个文件移动到子文件夹 "${subFolder.name}"`);
-
-        } catch (error) {
-            console.error(error);
-            alert("移动失败: " + error.message);
         }
     }
 
@@ -3146,86 +2927,6 @@ SOFTWARE.
         }
     }
 
-    // 在作品详情页添加"移动到子文件夹"按钮
-    async function addMoveToSubfolderButton() {
-        const artworkId = getArtworkId();
-        if (!artworkId) return;
-
-        try {
-            // 1. 检查"多页作品创建子文件夹"设置
-            const createSubFolderMode = getCreateSubFolder();
-            /*
-            if (createSubFolderMode === 'off') {
-                console.log('[Pixiv2Eagle] 子文件夹功能未启用，不显示按钮');
-                return;
-            }
-            */
-
-            // 2. 检查是否已保存
-            const savedInfo = await findSavedFolderForArtwork(artworkId);
-            /*
-            if (!savedInfo || !savedInfo.folder) {
-                console.log('[Pixiv2Eagle] 作品未保存，不显示按钮');
-                return;
-            }
-            */
-
-            // 3. 查找按钮容器（等待 DOM 加载）
-            await new Promise(resolve => setTimeout(resolve, 500)); // 等待页面完全加载
-            const container = document.querySelector(ARTWORK_BUTTON_CONTAINER_SELECTOR);
-            const refButton = document.querySelector(ARTWORK_BUTTON_REF_SELECTOR);
-            
-            if (!container) {
-                console.log('[Pixiv2Eagle] 未找到按钮容器:', ARTWORK_BUTTON_CONTAINER_SELECTOR);
-                console.log('[Pixiv2Eagle] 尝试查找所有可能的容器...');
-                const allDivs = document.querySelectorAll('div[class*="sc-7fd477ff"]');
-                console.log('[Pixiv2Eagle] 找到的相关容器:', allDivs.length);
-                allDivs.forEach((div, idx) => {
-                    console.log(`[Pixiv2Eagle] 容器 ${idx}:`, div.className);
-                });
-                return;
-            }
-
-            if (!refButton) {
-                console.log('[Pixiv2Eagle] 未找到参考按钮:', ARTWORK_BUTTON_REF_SELECTOR);
-                console.log('[Pixiv2Eagle] 容器内所有子元素:');
-                Array.from(container.children).forEach((child, idx) => {
-                    console.log(`[Pixiv2Eagle] 子元素 ${idx}:`, child.className, child.tagName);
-                });
-            }
-
-            // 4. 避免重复添加
-            if (document.getElementById('eagle-move-to-subfolder-btn')) {
-                console.log('[Pixiv2Eagle] 按钮已存在');
-                return;
-            }
-
-            // 5. 创建按钮
-            const btn = createPixivStyledButton("更新系列漫画至序列文件夹");
-            btn.id = 'eagle-move-to-subfolder-btn';
-            btn.style.marginLeft = '8px';
-            btn.onclick = async () => {
-                btn.textContent = '正在移动...';
-                btn.style.pointerEvents = 'none';
-                await moveArtworkToSubfolder(artworkId);
-                btn.textContent = '更新系列漫画至序列文件夹';
-                btn.style.pointerEvents = 'auto';
-            };
-
-            // 6. 插入按钮
-            if (refButton) {
-                container.insertBefore(btn, refButton);
-            } else {
-                // 如果没有参考按钮，直接添加到容器末尾
-                container.appendChild(btn);
-            }
-            console.log('[Pixiv2Eagle] ✅ 成功添加"移动到子文件夹"按钮');
-
-        } catch (error) {
-            console.error('[Pixiv2Eagle] ❌ 添加"移动到子文件夹"按钮失败:', error);
-        }
-    }
-
     // 主函数
     async function addButton() {
         // 移除旧按钮（如果存在）
@@ -3282,9 +2983,6 @@ SOFTWARE.
 
         // 自动检测是否已保存，已保存则更新按钮文本
         if (getAutoCheckSavedStatus()) updateSaveButtonIfSaved(saveButton);
-
-        // 添加"移动到子文件夹"按钮（如果适用）
-        addMoveToSubfolderButton();
     }
 
     const monitorConfig = [

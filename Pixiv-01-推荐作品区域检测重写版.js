@@ -56,44 +56,6 @@ SOFTWARE.
     const PIXIV_SECTION_CLASS = "sc-7709e4d9-0"; // deprecated
     const PIXIV_ARTIST_DIV_CLASS = "sc-946c1cc3-1 lnPJtB"; // deprecated
 
-    // DOM Selectors - Recommendation Area
-    const REC_SECTION_SELECTOR = 'section[class*="sc-79c00fd3-0"]'; // 推荐作品区域容器 (Section)
-    const REC_CONTAINER_SELECTOR = 'div.sc-bf8cea3f-0.dKbaFf'; // 推荐作品区域容器 (Div, 新版)
-    const REC_WORK_LINK_SELECTOR = 'a.sc-fab8f26d-6'; // 推荐作品链接 (用于提取 PID)
-    const REC_ARTIST_LINK_SELECTOR = 'a.sc-fbe982d0-2'; // 推荐作品画师链接 (用于提取 UID)
-    const REC_THUMBNAIL_SELECTOR = 'div.sc-f44a0b30-9.cvPXKv'; // 推荐作品缩略图容器 (首选标记位置)
-    const REC_THUMBNAIL_FALLBACK_SELECTOR = 'div.sc-fab8f26d-3.etVILu'; // 推荐作品缩略图容器 (备选)
-    const REC_THUMBNAIL_FALLBACK_PARTIAL_SELECTOR = 'div.sc-fab8f26d-3'; // 推荐作品缩略图容器 (部分匹配备选)
-
-    // DOM Selectors - Artist List / Series
-    const LIST_CONTAINER_SELECTOR = 'div.sc-bf8cea3f-0.dKbaFf'; // 画师插画/漫画列表容器
-    const SERIES_PAGE_LIST_SELECTOR = 'div.sc-de6bf819-3.cNVLSX'; // 系列页面作品列表容器
-    const THUMBNAIL_CONTAINER_SELECTOR = 'div.sc-f44a0b30-9.cvPXKv'; // 列表作品缩略图容器
-    const THUMBNAIL_CONTAINER_PARTIAL_SELECTOR = 'div.sc-f44a0b30-9'; // 列表作品缩略图容器 (部分匹配)
-    
-    // DOM Selectors - Novel
-    const NOVEL_TITLE_SELECTOR = 'h1.sc-41178ccf-3.irrkHK'; // 小说标题
-    const NOVEL_DESC_SELECTOR = 'div.sc-fcc502d1-0.jNYFaO > p.sc-fcc502d1-1.YOSSS'; // 小说简介
-    const NOVEL_SERIES_DESC_SELECTOR = 'div.sc-fcc502d1-0.jNYFaO > p.sc-fcc502d1-1.fDflWh'; // 小说系列简介
-    const NOVEL_COVER_SELECTOR = 'img.sc-41178ccf-19.cKuUeg'; // 小说封面图片
-    const NOVEL_SERIES_COVER_SELECTOR = 'img.sc-11435b73-2.hnPyQB'; // 小说系列封面图片
-    const NOVEL_AUTHOR_SELECTOR = 'h2.sc-b6a5d604-0.kepWbf a[data-gtm-value]'; // 小说作者链接 (含 ID)
-    const NOVEL_SERIES_AUTHOR_SELECTOR = 'h2.sc-b6a5d604-0.kepWbf a[data-gtm-user-id]'; // 小说系列作者链接 (含 ID)
-    const NOVEL_CONTENT_SELECTOR = 'div.sc-ejfMa-d.eXXQXn'; // 小说正文内容容器
-    const NOVEL_SERIES_SECTION_SELECTOR = 'section.sc-55920ee2-1'; // 小说所属系列区域 (用于判断是否属于系列)
-    const NOVEL_SERIES_LINK_SELECTOR = 'a.sc-13d2e2cd-0.gwOqfd[href^="/novel/series/"]'; // 小说系列链接
-    const NOVEL_SAVE_BUTTON_SECTION_SELECTOR = 'section.sc-44936c9d-0.bmSdAW'; // 小说保存按钮插入位置
-    const NOVEL_CHAPTER_LIST_SELECTOR = 'div.sc-794d489b-0.buoliH'; // 小说系列章节列表容器
-    const NOVEL_CHAPTER_ITEM_CONTAINER_SELECTOR = 'div.sc-3a91e6c3-6.eJoreT'; // 小说章节列表项容器 (用于插入标记)
-    const NOVEL_CHAPTER_REF_BUTTON_SELECTOR = 'button.sc-5d3311e8-0.iGxyRb'; // 小说章节列表参考按钮 (标记插在此之前)
-
-    // DOM Selectors - Misc
-    const SERIES_NAV_BUTTON_SELECTOR = 'div.sc-487e14c9-0.doUXUo'; // 漫画系列"加入追更"按钮 (用于判断是否为漫画系列)
-    const MANGA_SERIES_INFO_SELECTOR = 'div.sc-41178ccf-0.fwlXRJ a'; // 漫画系列信息 (用于提取章节序号)
-    const MANGA_SERIES_HEADER_SELECTOR = 'div.sc-e4a4c914-0.Hwtke'; // 漫画系列页面头部 (用于插入更新按钮)
-    const ARTWORK_BUTTON_CONTAINER_SELECTOR = 'div.sc-7fd477ff-3.jrRrCf'; // 作品详情页按钮容器
-    const ARTWORK_BUTTON_REF_SELECTOR = 'div.sc-7fd477ff-4.duoqQE'; // 作品详情页按钮插入参考点
-
     // 获取文件夹 ID
     function getFolderId() {
         return GM_getValue("pixivFolderId", "");
@@ -430,32 +392,7 @@ SOFTWARE.
                     ? data.data.items
                     : [];
 
-                // 1. 快速检查：直接对比列表返回的 url
-                let matched = items.find((item) => item.url === artworkUrl);
-                
-                // 2. 深度检查：如果列表没找到，遍历调用 /api/item/info 获取详细信息对比
-                // (优化：解决列表接口可能返回不完整或缓存数据的问题)
-                if (!matched && items.length > 0) {
-                    const concurrency = 5; // 并发数限制
-                    for (let i = 0; i < items.length; i += concurrency) {
-                        const chunk = items.slice(i, i + concurrency);
-                        const results = await Promise.all(chunk.map(async (item) => {
-                            try {
-                                const infoData = await gmFetch(`http://localhost:41595/api/item/info?id=${item.id}`);
-                                if (infoData && infoData.data && infoData.data.url === artworkUrl) {
-                                    return item;
-                                }
-                            } catch (e) {
-                                // 忽略单个获取失败
-                            }
-                            return null;
-                        }));
-                        
-                        matched = results.find(r => r);
-                        if (matched) break;
-                    }
-                }
-
+                const matched = items.find((item) => item.url === artworkUrl);
                 if (matched) {
                     return {
                         saved: true,
@@ -672,16 +609,15 @@ SOFTWARE.
 
     // 获取类型文件夹信息
     function getTypeFolderInfo(illustType) {
-        // illustType: 0=illust, 1=manga, 2=ugoira, "novel"=novel
+        // illustType: 0=illust, 1=manga, 2=ugoira
         // 映射: 0,2 -> 插画 (illustrations), 1 -> 漫画 (manga)
         if (illustType === 1) {
             return { name: "漫画", description: "manga" };
-        } else if (illustType === "novel") {
-            return { name: "小说", description: "novels" };
         } else {
             // 默认为插画 (包括 ugoira)
             return { name: "插画", description: "illustrations" };
         }
+        // 小说暂不支持，若支持则为 novels
     }
 
     // 查找或创建类型文件夹
@@ -733,23 +669,11 @@ SOFTWARE.
         try {
             const details = await getArtworkDetails(artworkId);
             const pixivFolderId = getFolderId();
-            
-            let artistFolder = null;
-            try {
-                artistFolder = await findArtistFolder(pixivFolderId, details.userId);
-            } catch (e) {
-                console.error("[Pixiv2Eagle] findArtistFolder 调用失败:", e);
-                return null;
-            }
-            
+            const artistFolder = await findArtistFolder(pixivFolderId, details.userId);
             if (!artistFolder) return null;
 
-            if (getDebugMode()) {
-                console.log(`[Pixiv2Eagle] 开始查找作品: ${artworkId}, 标题: ${details.title}`);
-            }
-
             // 检查当前页面是否为漫画系列（通过"加入追更列表"按钮判断）
-            const isSeriesPage = !!document.querySelector(SERIES_NAV_BUTTON_SELECTOR);
+            const isSeriesPage = !!document.querySelector('div.sc-487e14c9-0.doUXUo');
 
             // 默认在画师文件夹检查，如有系列或当前为系列页面则进入系列文件夹
             let currentFolder = artistFolder;
@@ -825,88 +749,6 @@ SOFTWARE.
             const savedChild = findInSubfolders(currentFolder);
             if (savedChild) {
                 return { folder: savedChild, itemId: null };
-            }
-
-            // 3. 尝试通过标题在画师文件夹及其子文件夹中搜索 (弥补上述检查可能遗漏的情况)
-            if (details.title) {
-                try {
-                    // 收集画师文件夹及其所有子文件夹的 ID
-                    const allFolderIds = [artistFolder.id];
-                    function collectFolderIds(folder) {
-                        if (folder.children) {
-                            folder.children.forEach(child => {
-                                allFolderIds.push(child.id);
-                                collectFolderIds(child);
-                            });
-                        }
-                    }
-                    collectFolderIds(artistFolder);
-
-                    if (getDebugMode()) {
-                        console.log(`[Pixiv2Eagle] 尝试通过标题搜索: "${details.title}", 搜索范围: ${allFolderIds.length} 个文件夹`);
-                    }
-
-                    const params = new URLSearchParams({
-                        folders: allFolderIds.join(','),
-                        keyword: details.title,
-                        limit: "50"
-                    });
-                    // 注意：Eagle 的 keyword 搜索是模糊匹配
-                    const searchUrl = `http://localhost:41595/api/item/list?${params.toString()}`;
-                    const data = await gmFetch(searchUrl);
-                    
-                    if (data && data.status === "success") {
-                        const items = Array.isArray(data.data) ? data.data : (data.data?.items || []);
-                        const artworkUrl = `https://www.pixiv.net/artworks/${artworkId}`;
-                        
-                        if (getDebugMode()) {
-                            console.log(`[Pixiv2Eagle] 标题搜索结果: 找到 ${items.length} 个项目`);
-                        }
-
-                        // 优先检查 URL 匹配
-                        let matched = items.find(item => item.url === artworkUrl);
-                        
-                        // 如果没有直接匹配，尝试获取详细信息验证 (深度检查)
-                        if (!matched && items.length > 0) {
-                            if (getDebugMode()) {
-                                console.log(`[Pixiv2Eagle] 列表 URL 未匹配，尝试深度检查 ${items.length} 个项目...`);
-                            }
-                            const concurrency = 5;
-                            for (let i = 0; i < items.length; i += concurrency) {
-                                const chunk = items.slice(i, i + concurrency);
-                                const results = await Promise.all(chunk.map(async (item) => {
-                                    try {
-                                        const infoData = await gmFetch(`http://localhost:41595/api/item/info?id=${item.id}`);
-                                        if (infoData && infoData.data && infoData.data.url === artworkUrl) {
-                                            return item;
-                                        }
-                                    } catch (e) { return null; }
-                                    return null;
-                                }));
-                                matched = results.find(r => r);
-                                if (matched) break;
-                            }
-                        }
-
-                        if (matched) {
-                            if (getDebugMode()) {
-                                console.log(`[Pixiv2Eagle] ✅ 通过标题搜索找到已保存作品:`, matched.id);
-                            }
-                            // 注意：这里返回的 folder 可能是 artistFolder，也可能是子文件夹
-                            // 但我们这里只返回 artistFolder 作为上下文，或者我们需要找到它实际所在的文件夹？
-                            // findSavedFolderForArtwork 的返回值主要用于判断 saved=true
-                            // 如果需要精确的 folder 对象，可能需要进一步处理，但目前逻辑似乎只用到了 folder.id 或 folder 对象本身
-                            // 为了安全起见，我们返回 artistFolder，因为我们确定它在画师文件夹树下
-                            return { folder: artistFolder, itemId: matched.id };
-                        } else {
-                            console.log(`[Pixiv2Eagle] ❌ 标题搜索未找到匹配 URL 的作品`);
-                        }
-                    }
-                } catch (err) {
-                    console.error("通过标题搜索失败:", err);
-                }
-            } else {
-                console.log(`[Pixiv2Eagle] ❌ 无法获取作品标题，跳过标题搜索`);
             }
 
             return null;
@@ -1164,28 +1006,6 @@ SOFTWARE.
                 illustType: basicInfo.body.illustType,
                 seriesNavData: basicInfo.body.seriesNavData,
             };
-
-            // 尝试从 DOM 提取漫画章节序号并优化标题
-            // 格式通常为 "系列名称 #序号"，优化后为 "#序号 章节标题"
-            if (details.illustType === 1) {
-                try {
-                    const seriesInfoEl = document.querySelector(MANGA_SERIES_INFO_SELECTOR);
-                    if (seriesInfoEl) {
-                        const text = seriesInfoEl.textContent.trim();
-                        const lastHashIndex = text.lastIndexOf('#');
-                        if (lastHashIndex !== -1) {
-                            const chapterNum = text.substring(lastHashIndex + 1).trim();
-                            // 简单验证是否包含数字
-                            if (/\d/.test(chapterNum)) {
-                                details.illustTitle = `#${chapterNum} ${details.illustTitle}`;
-                                console.log(`[Pixiv2Eagle] 已优化漫画标题: ${details.illustTitle}`);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.warn('[Pixiv2Eagle] 尝试优化漫画标题失败:', e);
-                }
-            }
 
             return details;
         } catch (error) {
@@ -1683,365 +1503,6 @@ SOFTWARE.
         }
     }
 
-    // 将作品文件移动到子文件夹
-    async function moveArtworkToSubfolder(artworkId) {
-        const folderId = getFolderId();
-        if (!folderId) {
-            alert("请先设置 Pixiv 文件夹 ID！");
-            return;
-        }
-
-        const eagleStatus = await checkEagle();
-        if (!eagleStatus.running) {
-            alert("Eagle 未启动！");
-            return;
-        }
-
-        // 检查是否启用了子文件夹功能
-        const createSubFolderMode = getCreateSubFolder();
-        if (createSubFolderMode === 'off') {
-            alert("请先启用多页作品子文件夹功能！");
-            return;
-        }
-
-        try {
-            // 1. 获取作品详情
-            const details = await getArtworkDetails(artworkId);
-            if (!details) {
-                alert("无法获取作品详情");
-                return;
-            }
-
-            // 2. 查找作品所在文件夹
-            const savedInfo = await findSavedFolderForArtwork(artworkId);
-            if (!savedInfo || !savedInfo.folder) {
-                alert("未找到作品在 Eagle 中的保存位置");
-                return;
-            }
-
-            const parentFolder = savedInfo.folder;
-
-            // 3. 检查是否需要创建子文件夹（根据 createSubFolder 设置）
-            const shouldCreateSubfolder = 
-                createSubFolderMode === 'always' || 
-                (createSubFolderMode === 'multi-page' && details.pageCount > 1) ||
-                details.illustType === 1; // 漫画始终创建子文件夹
-
-            if (!shouldCreateSubfolder) {
-                alert("根据当前设置，此作品不需要子文件夹");
-                return;
-            }
-
-            // 4. 查找或创建子文件夹
-            let subFolder = null;
-            if (parentFolder.children) {
-                subFolder = parentFolder.children.find(c => c.description === artworkId);
-            }
-
-            if (!subFolder) {
-                // 创建子文件夹
-                const subFolderId = await createEagleFolder(
-                    details.illustTitle,
-                    parentFolder.id,
-                    artworkId
-                );
-                subFolder = { id: subFolderId, name: details.illustTitle };
-                console.log(`[Pixiv2Eagle] 已创建子文件夹: ${details.illustTitle}`);
-            }
-
-            // 5. 获取所有属于该作品的文件
-            const items = await getAllEagleItemsInFolder(parentFolder.id);
-            const artworkUrl = `https://www.pixiv.net/artworks/${artworkId}`;
-            const artworkItems = items.filter(item => item.url === artworkUrl);
-
-            if (artworkItems.length === 0) {
-                alert("未找到需要移动的文件");
-                return;
-            }
-
-            // 6. 移动文件到子文件夹
-            for (const item of artworkItems) {
-                // 修改 folders 属性并保存
-                await gmFetch("http://localhost:41595/api/item/update", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        id: item.id,
-                        folders: [subFolder.id]
-                    })
-                });
-                console.log(`[Pixiv2Eagle] 已移动文件: ${item.name} -> ${subFolder.name}`);
-            }
-
-            alert(`✅ 成功将 ${artworkItems.length} 个文件移动到子文件夹 "${subFolder.name}"`);
-
-        } catch (error) {
-            console.error(error);
-            alert("移动失败: " + error.message);
-        }
-    }
-
-    // 更新系列漫画的序号 (批量重命名)
-    async function updateSeriesChapters() {
-        const folderId = getFolderId();
-        if (!folderId) {
-            alert("请先设置 Pixiv 文件夹 ID！");
-            return;
-        }
-
-        const eagleStatus = await checkEagle();
-        if (!eagleStatus.running) {
-            alert("Eagle 未启动！");
-            return;
-        }
-
-        // 1. 获取系列信息
-        const seriesIdMatch = location.pathname.match(/\/series\/(\d+)/);
-        if (!seriesIdMatch) {
-            alert("无法获取系列 ID");
-            return;
-        }
-        const seriesId = seriesIdMatch[1];
-
-        // 尝试获取画师 ID (从当前 URL 中查找)
-        // URL 格式通常为 /user/{uid}/series/{seriesId} 或 /users/{uid}/series/{seriesId}
-        let artistId = null;
-        const artistIdMatch = location.pathname.match(new RegExp(`\/users?\/(\\d+)\/series\/${seriesId}`));
-        if (artistIdMatch) {
-            artistId = artistIdMatch[1];
-        }
-
-        if (!artistId) {
-            alert("无法获取画师 ID");
-            return;
-        }
-
-        try {
-            // 2. 查找 Eagle 中的系列文件夹
-            const artistFolder = await findArtistFolder(folderId, artistId);
-            if (!artistFolder) {
-                alert("Eagle 中未找到该画师的文件夹");
-                return;
-            }
-
-            let seriesFolder = findSeriesFolderInArtist(artistFolder, artistId, seriesId);
-
-            // 如果在画师根目录下没找到，尝试在类型文件夹（如“漫画”）中查找
-            if (!seriesFolder && artistFolder.children) {
-                const typeFolders = artistFolder.children.filter(c => ['illustrations', 'manga', 'novels'].includes(c.description));
-                for (const tf of typeFolders) {
-                    const found = findSeriesFolderInArtist(tf, artistId, seriesId);
-                    if (found) {
-                        seriesFolder = found;
-                        break;
-                    }
-                }
-            }
-
-            if (!seriesFolder) {
-                alert("Eagle 中未找到该系列的文件夹");
-                return;
-            }
-
-            // 3. 遍历页面上的章节列表
-            const listContainer = document.querySelector(SERIES_PAGE_LIST_SELECTOR);
-            if (!listContainer) {
-                alert("未找到章节列表");
-                return;
-            }
-
-            const lis = listContainer.querySelectorAll('li');
-            console.log(`[Pixiv2Eagle] 找到 ${lis.length} 个章节列表项`);
-            
-            if (!seriesFolder.children) {
-                console.log("[Pixiv2Eagle] 系列文件夹没有子文件夹信息，尝试重新获取");
-                // 尝试重新获取该文件夹的详情，以确保 children 存在
-                // 注意：Eagle API folder/list 返回的是全树，但如果我们拿到的对象不完整，可能需要刷新
-                // 这里假设 seriesFolder 已经是完整的。如果为空，可能是真的没有子文件夹。
-                seriesFolder.children = [];
-            }
-            console.log(`[Pixiv2Eagle] Eagle 系列文件夹中有 ${seriesFolder.children.length} 个子文件夹`);
-
-            let updateCount = 0;
-
-            for (const li of lis) {
-                // 优先使用用户指定的标题容器选择器，确保提取到的是标题文本而非缩略图或其他链接
-                let link = li.querySelector('div.sc-fab8f26d-1.kcKSxC a');
-                // 降级策略
-                if (!link) link = li.querySelector('a[href*="/artworks/"]');
-                
-                if (!link) continue;
-
-                const href = link.getAttribute('href');
-                const pidMatch = href.match(/\/artworks\/(\d+)/);
-                if (!pidMatch) continue;
-                const pid = pidMatch[1];
-
-                // 克隆节点以清理干扰文本（如徽章）
-                const linkClone = link.cloneNode(true);
-                
-                // 移除 Eagle 标记
-                const eagleBadge = linkClone.querySelector('.eagle-saved-badge');
-                if (eagleBadge) eagleBadge.remove();
-
-                // 移除 R-18 标记 (通常是 div 或 span，内容为 R-18)
-                const badges = linkClone.querySelectorAll('div, span');
-                badges.forEach(el => {
-                    if (el.textContent.trim() === 'R-18') el.remove();
-                });
-
-                const title = linkClone.textContent.trim();
-
-                // 尝试提取章节序号
-                // 假设标题包含 #数字 或 第数字话，或者是纯数字
-                let chapterNum = null;
-                const numMatch = title.match(/#(\d+)/) || title.match(/第(\d+)[话話]/) || title.match(/^(\d+)$/);
-                if (numMatch) {
-                    chapterNum = numMatch[1];
-                }
-
-                if (!chapterNum) {
-                    console.log(`[Pixiv2Eagle] 无法从标题 "${title}" 中提取序号，跳过`);
-                    continue;
-                }
-
-                // 4. 在 Eagle 系列文件夹中查找对应章节文件夹
-                // 假设章节文件夹的 description 是 PID
-                // 使用 trim() 避免空白字符导致匹配失败
-                const chapterFolder = seriesFolder.children.find(c => (c.description || "").trim() === pid);
-                if (chapterFolder) {
-                    // 构造新名称: #序号 标题
-                    // 如果标题本身已经包含 #序号，则避免重复
-                    let newName = title;
-                    if (!newName.startsWith(`#${chapterNum}`)) {
-                        newName = `#${chapterNum} ${title}`;
-                    }
-
-                    // 如果名称不同，则重命名文件夹
-                    if (chapterFolder.name !== newName) {
-                        console.log(`[Pixiv2Eagle] 重命名文件夹: ${chapterFolder.name} -> ${newName}`);
-                        await gmFetch("http://localhost:41595/api/folder/rename", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ folderId: chapterFolder.id, newName: newName })
-                        });
-                        updateCount++;
-                    }
-
-                    // 5. 重命名文件夹内的图片
-                    // 获取文件夹内所有图片
-                    const items = await getAllEagleItemsInFolder(chapterFolder.id);
-                    if (items && items.length > 0) {
-                        for (const item of items) {
-                            // 尝试提取页码后缀 (_0, _1, _p0, _p1 等)
-                            // Eagle 的 item.name 通常不包含扩展名
-                            const suffixMatch = item.name.match(/(_p?\d+)$/);
-                            let suffix = "";
-                            
-                            if (suffixMatch) {
-                                suffix = suffixMatch[1];
-                            } else if (items.length > 1) {
-                                // 如果有多张图片且无法识别后缀，跳过以防命名冲突
-                                console.warn(`[Pixiv2Eagle] 无法识别图片后缀且存在多张图片，跳过重命名: ${item.name}`);
-                                continue;
-                            }
-
-                            const newItemName = `${newName}${suffix}`;
-                            if (item.name !== newItemName) {
-                                console.log(`[Pixiv2Eagle] 重命名图片: ${item.name} -> ${newItemName}`);
-                                await gmFetch("http://localhost:41595/api/item/update", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ id: item.id, name: newItemName })
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-
-            alert(`更新完成！共更新了 ${updateCount} 个章节文件夹。`);
-
-        } catch (e) {
-            console.error(e);
-            alert("更新失败: " + e.message);
-        }
-    }
-
-    // 添加更新系列按钮
-    async function addUpdateSeriesButton() {
-        // 仅在系列页面运行
-        if (!location.pathname.includes('/series/')) return;
-
-        // 目标：放在 "阅读第一话" 按钮旁边
-        // 选择器：div.gtm-manga-series-first-story 或其父容器
-        // 通常结构：div > a.gtm-manga-series-first-story
-        // 我们尝试找到包含该按钮的容器
-        const firstStoryBtn = await waitForElement('.gtm-manga-series-first-story', 5000);
-        if (!firstStoryBtn) {
-            // 降级：如果找不到特定按钮，尝试放在 header 中
-            const header = await waitForElement(MANGA_SERIES_HEADER_SELECTOR);
-            if (!header) return;
-            if (document.getElementById('eagle-update-series-btn')) return;
-            
-            const btn = createPixivStyledButton("更新系列序号");
-            btn.id = 'eagle-update-series-btn';
-            btn.style.marginLeft = '10px';
-            btn.onclick = updateSeriesChapters;
-            header.appendChild(btn);
-            return;
-        }
-
-        // 找到容器 (通常是 firstStoryBtn 的父级或本身)
-        // 假设 firstStoryBtn 是一个 a 标签或 div，我们需要插在它后面
-        const container = firstStoryBtn.parentElement;
-        if (!container) return;
-
-        if (document.getElementById('eagle-update-series-btn')) return;
-
-        const btn = createPixivStyledButton("更新系列漫画的序号");
-        btn.id = 'eagle-update-series-btn';
-        // 样式调整：蓝色背景，白色文字，圆角
-        btn.style.backgroundColor = '#0096fa';
-        btn.style.color = '#fff';
-        btn.style.border = 'none';
-        btn.style.fontWeight = 'bold';
-        btn.style.marginLeft = '16px'; // 保持适当间距
-        btn.style.height = '32px'; // 与 Pixiv 按钮高度一致
-        btn.style.padding = '0 16px';
-        
-        // 覆盖默认的 hover 效果
-        btn.onmouseenter = () => {
-            btn.style.backgroundColor = '#0075c5';
-        };
-        btn.onmouseleave = () => {
-            btn.style.backgroundColor = '#0096fa';
-            btn.style.color = '#fff';
-        };
-        btn.onmousedown = () => {
-            btn.style.backgroundColor = '#005c9c';
-        };
-        btn.onmouseup = () => {
-            btn.style.backgroundColor = '#0075c5';
-        };
-
-        btn.onclick = updateSeriesChapters;
-
-        // 插入到 firstStoryBtn 后面
-        // 检查 container 的布局，如果是 flex，直接 append 即可
-        // 为了保险，使用 insertBefore nextSibling
-        container.insertBefore(btn, firstStoryBtn.nextSibling);
-        
-        // 确保容器是 flex 布局以便对齐
-        const computedStyle = window.getComputedStyle(container);
-        if (computedStyle.display !== 'flex') {
-            container.style.display = 'flex';
-            container.style.alignItems = 'center';
-        }
-        // 强制设置宽度为 100%
-        container.style.width = '100%';
-    }
-
     // 获取指定 Eagle 文件夹下所有 items（分页）
     async function getAllEagleItemsInFolder(folderId) {
         const limit = 200;
@@ -2095,19 +1556,17 @@ SOFTWARE.
 
             console.log('[Pixiv2Eagle] 当前页面匹配条件，开始处理');
 
-            // 确定搜索范围与列表容器
-            let listContainer = null;
-            
-            // 1. 系列页面
+            // 确定搜索范围：在系列页面限制为用户指定的列表容器，以避免误匹配底部导航链接
+            let searchRoot = document.body;
             if (location.pathname.includes('/series/')) {
-                const selector = SERIES_PAGE_LIST_SELECTOR;
-                console.log('[Pixiv2Eagle] 系列页面：尝试定位列表容器', selector);
+                const seriesContainerSelector = 'div.sc-de6bf819-3.cNVLSX';
+                console.log('[Pixiv2Eagle] 系列页面：尝试定位列表容器', seriesContainerSelector);
                 // 尝试等待容器出现（最多 5 秒，避免过久阻塞）
-                listContainer = await new Promise(resolve => {
-                    const el = document.querySelector(selector);
+                const container = await new Promise(resolve => {
+                    const el = document.querySelector(seriesContainerSelector);
                     if (el) return resolve(el);
                     const obs = new MutationObserver(() => {
-                        const found = document.querySelector(selector);
+                        const found = document.querySelector(seriesContainerSelector);
                         if (found) {
                             obs.disconnect();
                             resolve(found);
@@ -2119,57 +1578,101 @@ SOFTWARE.
                         resolve(null);
                     }, 5000);
                 });
-            } 
-            // 2. 插画/漫画页面 (以及用户主页可能的列表)
-            else {
-                // 用户提供的选择器: div.sc-bf8cea3f-0.dKbaFf
-                const selector = LIST_CONTAINER_SELECTOR;
-                console.log('[Pixiv2Eagle] 插画/漫画页面：尝试定位列表容器', selector);
-                listContainer = await waitForElement(selector, 5000);
+
+                if (container) {
+                    searchRoot = container;
+                    console.log('[Pixiv2Eagle] 系列页面：已锁定列表容器，将仅在此范围内检测作品');
+                } else {
+                    console.log('[Pixiv2Eagle] 系列页面：未找到指定列表容器 (sc-de6bf819-3 cNVLSX)，停止检测以避免误报');
+                    return;
+                }
             }
 
-            const anchorMap = {};
+            // 等待页面中出现至少一个作品链接（最长等待 10s）
+            const waitForAnchors = (timeout = 10000) =>
+                new Promise((resolve) => {
+                    const selector = 'a[href^="/artworks/"], a[href*="/artworks/"]';
+                    const existing = searchRoot.querySelectorAll(selector);
+                    if (existing && existing.length > 0) return resolve(Array.from(existing));
 
-            if (listContainer) {
-                const lis = listContainer.querySelectorAll('li');
-                console.log(`[Pixiv2Eagle] 在列表容器中找到 ${lis.length} 个作品项`);
-                
-                for (const li of lis) {
-                    // 查找作品链接提取 PID
-                    // 注意：有时一个 li 可能包含多个链接，通常取第一个指向 artworks 的
-                    const link = li.querySelector('a[href*="/artworks/"]');
-                    if (!link) continue;
-                    
-                    const href = link.getAttribute('href');
-                    const m = href.match(/\/artworks\/(\d+)/);
-                    if (!m) continue;
-                    
-                    const pid = m[1];
-                    
-                    // 查找目标缩略图容器 (标记插入点)
-                    // 优先匹配带 radius="4" 的 div.sc-f44a0b30-9.cvPXKv
-                    let target = li.querySelector(THUMBNAIL_CONTAINER_SELECTOR);
-                    if (!target) target = li.querySelector('div.sc-f44a0b30-9');
-                    
-                    // 备选：如果找不到特定 class，尝试找图片容器
-                    if (!target) {
-                        const img = li.querySelector('img[src*="i.pximg.net"]');
-                        if (img) {
-                            // 通常图片被包裹在 picture > div 或直接在 div 中
-                            // 我们希望找到那个有圆角和 overflow 的容器
-                            target = img.closest('div[radius="4"]') || img.parentElement;
+                    const obs = new MutationObserver(() => {
+                        const found = searchRoot.querySelectorAll(selector);
+                        if (found && found.length > 0) {
+                            obs.disconnect();
+                            resolve(Array.from(found));
                         }
-                    }
+                    });
+                    obs.observe(searchRoot, { childList: true, subtree: true });
 
-                    if (target) {
-                        anchorMap[pid] = target;
-                    }
-                }
-            } else {
-                console.log('[Pixiv2Eagle] 未找到列表容器，跳过检测');
+                    setTimeout(() => {
+                        try {
+                            obs.disconnect();
+                        } catch (e) {}
+                        resolve(Array.from(searchRoot.querySelectorAll(selector)));
+                    }, timeout);
+                });
+
+            const anchors = await waitForAnchors(10000);
+            if (!anchors || anchors.length === 0) {
+                log('未检测到作品链接');
+                console.log('[Pixiv2Eagle] 未检测到作品链接');
                 return;
             }
 
+            console.log('[Pixiv2Eagle] 检测到', anchors.length, '个作品链接');
+
+            // 构建 anchor map：为每个 artwork id 选择最佳的 anchor 作为插入位置
+            // 优先级（评分高到低）：
+            // - 包含图片的锚点（+10）
+            // - 系列缩略图容器 div.sc-f44a0b30-9(.cvPXKv) (+5)
+            // - 外层系列容器 div.sc-e83d358-1 (+3)
+            // - 艺术家列表卡片 div.sc-4822cddd-0(.eCgTWT) (+1)
+            const anchorMap = {};
+            function scoreAnchor(el) {
+                if (!el || !(el instanceof Element)) return -1;
+                let score = 0;
+
+                // 1. 图片权重：包含图片的链接通常是作品的主缩略图，优先级最高
+                if (el.querySelector('img') || el.querySelector('picture')) score += 10;
+
+                // 2. 容器权重（累加）：越具体的容器分值越高
+                // 系列缩略图容器
+                if (el.closest && (el.closest('div.sc-f44a0b30-9.cvPXKv') || el.closest('div.sc-f44a0b30-9'))) score += 5;
+                
+                // 外层系列容器
+                if (el.closest && el.closest('div.sc-e83d358-1')) score += 3;
+                
+                // 艺术家列表卡片
+                if (el.closest && (el.closest('div.sc-4822cddd-0.eCgTWT') || el.closest('div.sc-4822cddd-0'))) score += 1;
+
+                return score;
+            }
+
+            for (const a of anchors) {
+                const href = a.getAttribute('href') || '';
+                const m = href.match(/\/artworks\/(\d+)/);
+                if (m) {
+                    const id = m[1];
+                    const s = scoreAnchor(a);
+                    if (!anchorMap[id]) {
+                        anchorMap[id] = { el: a, score: s };
+                    } else {
+                        const existing = anchorMap[id];
+                        // 只有当新锚点分数更高时才替换（同分保持先出现的，通常是DOM靠前的）
+                        // 注意：如果页面布局导致"下一章"链接（指向ID X）出现在"ID X的主卡片"之前，
+                        // 且两者分数相同，则会保留错误的"下一章"链接。
+                        // 因此 scoreAnchor 必须确保主缩略图的分数显著高于其他链接。
+                        if ((s || 0) > (existing.score || 0)) {
+                            if (debug) log(`更新作品 ${id} 的锚点: score ${existing.score} -> ${s}`);
+                            anchorMap[id] = { el: a, score: s };
+                        }
+                    }
+                }
+            }
+            // 将 map 中的值规范为元素引用（丢弃 score）
+            for (const k of Object.keys(anchorMap)) {
+                anchorMap[k] = anchorMap[k].el || anchorMap[k];
+            }
             const artworkIds = Object.keys(anchorMap);
             if (artworkIds.length === 0) {
                 log('未解析到任何 artwork id');
@@ -2177,9 +1680,6 @@ SOFTWARE.
                 return;
             }
 
-            console.log('[Pixiv2Eagle] 检测到', artworkIds.length, '个作品链接/目标容器');
-
-            // 移除旧的评分逻辑，直接使用 anchorMap
             console.log('[Pixiv2Eagle] 解析到 artworkIds:', artworkIds.slice(0, 5).join(','), artworkIds.length > 5 ? '...' : '');
 
             // 获取画师 ID - 支持 /user/{id} 和 /users/{id} 两种格式
@@ -2244,9 +1744,6 @@ SOFTWARE.
 
             // 如果是系列页面，优先查找系列文件夹并在该文件夹下递归寻找 item/url 与子文件夹描述（备注为 pid）
             if (location.pathname.includes('/series/')) {
-                // 尝试添加更新按钮
-                addUpdateSeriesButton();
-
                 console.log('[Pixiv2Eagle] 检测到系列页面，开始处理系列文件夹');
                 try {
                     const seriesMatch = location.pathname.match(/\/series\/(\d+)/);
@@ -2314,11 +1811,217 @@ SOFTWARE.
 
             // 插入标记的函数：将勾号浮动到作品卡片容器左下角（优先使用容器类名: sc-4822cddd-0 eCgTWT），
             // 同时支持系列缩略图容器：sc-e83d358-1（包含 sc-f44a0b30-9 cvPXKv）
-            // 插入标记的函数：直接在指定的容器中插入勾号
-            const insertBadgeToContainer = (container, matchInfo = {}) => {
-                if (!container) return;
+            const insertBadge = (anchor, matchInfo = {}) => {
+                if (!anchor) return;
+
+                // 当在系列页面时，严格限定标记只在每个系列项的外层容器里插入
+                // 优先寻找同时具有两个类名的容器：sc-e83d358-1 和 gIHHFW
+                if (location.pathname.includes('/series/')) {
+                    // 在系列页面时，逐层向上查找一个合理的“系列项”容器。
+                    // 目标优先级：sc-e83d358-1(.gIHHFW) -> sc-f44a0b30-9(.cvPXKv) -> 含有缩略图的祖先
+                    function findSeriesItemContainer(start) {
+                        if (!start) return null;
+                        let cur = start instanceof Element ? start : start.parentElement;
+                        let depth = 0;
+                        while (cur && cur !== document.body && depth < 8) {
+                            try {
+                                // 优先匹配 Pixiv 系列外层/项容器
+                                if (cur.matches && (cur.matches('div.sc-e83d358-1') || cur.matches('div.sc-e83d358-1.gIHHFW'))) return cur;
+                                // 也把外层盒子 sc-f44a0b30-0 视为候选（包含宽高 wrapper）
+                                if (cur.matches && cur.matches('div.sc-f44a0b30-0')) return cur;
+                                if (cur.matches && (cur.matches('div.sc-f44a0b30-9') || cur.matches('div.sc-f44a0b30-9.cvPXKv'))) return cur;
+                                // 如果元素包含明显的 pixiv 缩略图，也可作为候选
+                                const img = cur.querySelector && cur.querySelector('img');
+                                if (img && typeof img.src === 'string' && img.src.includes('i.pximg.net')) return cur;
+                            } catch (e) {
+                                // ignore
+                            }
+                            cur = cur.parentElement;
+                            depth++;
+                        }
+                        return null;
+                    }
+
+                    const strictSeriesContainer = findSeriesItemContainer(anchor);
+                    if (!strictSeriesContainer) {
+                        if (debug) log('系列页面：未在 anchor 的祖先链中找到系列项容器（尝试宽松匹配）', matchInfo.artworkId);
+                        console.log('[Pixiv2Eagle] 系列页面：未在 anchor 的祖先链中找到系列项容器，尝试宽松匹配', matchInfo.artworkId);
+                        // 不立即返回——改为允许后续更宽松的匹配（由后面的容器验证决定）
+                    } else {
+                        // 找到后强制为容器，避免回退到过高的父容器
+                        var forcedSeriesContainer = strictSeriesContainer;
+                    }
+                }
+
+                // 查找候选容器的策略：
+                // 1. 优先找 sc-e83d358-1（系列页面的外层容器）
+                // 2. 其次找 sc-f44a0b30-9.cvPXKv（系列缩略图）
+                // 3. 再找 sc-4822cddd-0.eCgTWT（艺术家列表卡片）
+                // 4. 最后回退到 parentElement
+                let container = null;
                 
-                // 防止重复插入
+                // 如果在系列页面并已找到强制容器，则直接使用它
+                if (typeof forcedSeriesContainer !== 'undefined' && forcedSeriesContainer) {
+                    container = forcedSeriesContainer;
+                    if (debug) log('使用强制的系列外层容器:', matchInfo.artworkId);
+                    console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '使用强制的系列外层容器 (sc-e83d358-1.gIHHFW)');
+                } else {
+                    // 首先尝试找最外层的系列容器（sc-e83d358-1）
+                    const seriesOuterContainer = anchor.closest('div.sc-e83d358-1');
+                    if (seriesOuterContainer) {
+                        container = seriesOuterContainer;
+                        if (debug) log('找到系列外层容器:', matchInfo.artworkId);
+                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '找到系列外层容器 (sc-e83d358-1)');
+                    }
+                }
+                
+                // 如果没有外层容器，继续尝试其他选项
+                if (!container) {
+                    container =
+                        anchor.closest('div.sc-e83d358-1') ||
+                        anchor.closest('div.sc-f44a0b30-0') ||
+                        anchor.closest('div.sc-f44a0b30-9.cvPXKv') ||
+                        anchor.closest('div.sc-f44a0b30-9') ||
+                        anchor.closest('div.sc-4822cddd-0.eCgTWT') ||
+                        anchor.closest('div.sc-4822cddd-0');
+                }
+
+                if (!container) container = anchor.parentElement;
+                if (!container) return;
+
+                // 验证容器是否为作品卡片或系列缩略图：
+                // - 普通作品卡片须包含 Pixiv 缩略图（i.pximg.net）或 <picture>/<img>
+                // - 系列缩略图容器（sc-f44a0b30-9.cvPXKv）允许任何 <img> 或 <picture>
+                // 优先基于 anchor 判断缩略图，避免将包含大量缩略图的上层容器误判为目标容器
+                function containsPixivThumbnail(el, anchor) {
+                    try {
+                        if (!el) return false;
+                        // 优先检查 anchor 本身是否包含图片（更接近缩略图位置）
+                        if (anchor && anchor.querySelector) {
+                            const aImg = anchor.querySelector('img');
+                            if (aImg && typeof aImg.src === 'string' && aImg.src.includes('i.pximg.net')) return true;
+                            const aPic = anchor.querySelector('picture');
+                            if (aPic && aPic.querySelector('img')) return true;
+                        }
+                        // 否则检查容器内的直接图片（但优先匹配与 anchor 相近的图片）
+                        const imgs = Array.from(el.querySelectorAll('img'));
+                        for (const img of imgs) {
+                            if (img && typeof img.src === 'string' && img.src.includes('i.pximg.net')) {
+                                // 确保该 img 在容器中且尽量靠近 anchor（祖先关系或共享最近公共祖先）
+                                if (!anchor || el.contains(anchor)) return true;
+                            }
+                        }
+                        const pic = el.querySelector('picture');
+                        if (pic && pic.querySelector('img')) return true;
+                        return false;
+                    } catch (e) {
+                        return false;
+                    }
+                }
+
+                function containsAnyImg(el, anchor) {
+                    try {
+                        if (!el) return false;
+                        // 优先检查 anchor 下的 img/picture
+                        if (anchor && anchor.querySelector) {
+                            if (anchor.querySelector('img')) return true;
+                            if (anchor.querySelector('picture')) return true;
+                        }
+                        // 再检查容器内的直接 img/picture，但避免把超大容器误判
+                        const directImg = el.querySelector('img');
+                        if (directImg) return true;
+                        const directPic = el.querySelector('picture');
+                        if (directPic) return true;
+                        return false;
+                    } catch (e) {
+                        return false;
+                    }
+                }
+
+                // 如果容器本身不满足条件，则向上查找最多 4 层祖先来验证
+                let valid = false;
+                // 优先判断常见 pixiv 缩略图
+                if (containsPixivThumbnail(container, anchor)) {
+                    valid = true;
+                    if (debug) log('容器验证通过 (pixiv缩略图):', matchInfo.artworkId);
+                    console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '容器验证通过 (pixiv缩略图)');
+                }
+
+                // 如果是系列页面容器（sc-e83d358-1 或外层盒子 sc-f44a0b30-0），允许任何包含图片的容器
+                if (!valid && (container.classList.contains('sc-e83d358-1') || container.classList.contains('sc-f44a0b30-0'))) {
+                    if (containsAnyImg(container, anchor)) {
+                        valid = true;
+                        if (debug) log('容器验证通过 (系列页面外层容器):', matchInfo.artworkId);
+                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '容器验证通过 (系列页面外层容器 sc-e83d358-1)');
+                    }
+                }
+
+                // 如果容器或其祖先是系列缩略图类，则允许任何 img/picture
+                if (!valid) {
+                    const seriesAncestor = container.closest('div.sc-f44a0b30-0') || container.closest('div.sc-f44a0b30-9.cvPXKv') || container.closest('div.sc-f44a0b30-9');
+                    if (seriesAncestor && containsAnyImg(seriesAncestor, anchor)) {
+                        container = seriesAncestor;
+                        valid = true;
+                        if (debug) log('容器验证通过 (系列缩略图):', matchInfo.artworkId);
+                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '容器验证通过 (系列缩略图 sc-f44a0b30-9)');
+                    }
+                }
+
+                // 继续向上寻找包含缩略图的祖先（最多 4 层）
+                let up = container;
+                let depth = 0;
+                while (!valid && up.parentElement && depth < 4) {
+                    up = up.parentElement;
+                    if (containsPixivThumbnail(up, anchor) || containsAnyImg(up, anchor)) {
+                        container = up;
+                        valid = true;
+                        if (debug) log('容器验证通过 (向上搜索层级 ' + depth + '):', matchInfo.artworkId);
+                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '容器验证通过 (向上搜索层级 ' + depth + ')');
+                        break;
+                    }
+                    depth++;
+                }
+
+                if (!valid) {
+                    // 不是典型的作品卡片或系列缩略图（例如 series 阅读按钮），跳过标注
+                    if (debug) log('容器验证失败，跳过标注:', matchInfo.artworkId, '容器类名:', container.className);
+                    return;
+                }
+
+                // 在确认 container 后，检查该 container 是否确实包含当前 anchor。
+                // 若不包含，尝试基于 artworkId 在页面上重新查找对应的 anchor 并获取合适的容器（修复错位插入问题）。
+                try {
+                    const anchorRectFallback = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : null;
+                    console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '初始 anchorRect:', anchorRectFallback);
+                    if (anchor && !container.contains(anchor)) {
+                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '当前 container 不包含 anchor，尝试通过 artworkId 查找正确的 anchor');
+                        try {
+                            const selector = `a[href*="/artworks/${matchInfo.artworkId}"]`;
+                            const found = document.querySelector(selector);
+                            if (found) {
+                                // 以新的 anchor 重新寻找容器
+                                console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '在页面上找到 anchor（fallback）');
+                                anchor = found; // 替换局部引用
+                                // 重新计算容器优先级：优先尝试严格的系列项容器查找
+                                if (typeof findSeriesItemContainer === 'function') {
+                                    const retryContainer = findSeriesItemContainer(anchor) || anchor.closest('div.sc-e83d358-1') || anchor.closest('div.sc-f44a0b30-0') || anchor.closest('div.sc-f44a0b30-9') || anchor.closest('div.sc-4822cddd-0') || anchor.parentElement;
+                                    if (retryContainer) {
+                                        container = retryContainer;
+                                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '回退后选定的新 container 类名:', container.className);
+                                    }
+                                }
+                            } else {
+                                console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '无法在页面上找到对应的 anchor（fallback 未命中）');
+                            }
+                        } catch (e) {
+                            console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '尝试基于 artworkId 回退 anchor 时出错:', e);
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+
+                // 防止重复插入（用 data 属性放在容器上）
                 if (container.dataset.eagleSaved === '1') return;
 
                 // 确保容器为定位上下文
@@ -2327,20 +2030,51 @@ SOFTWARE.
                     if (!cs || cs.position === 'static') {
                         container.style.position = 'relative';
                     }
-                    // 确保 overflow 不会隐藏徽章
-                    if (container.style.overflow !== 'visible') {
-                         container.style.overflow = 'visible';
-                    }
                 } catch (e) {
                     // ignore
+                }
+
+                // 选择最终用于插入徽章的父元素：
+                // 优先使用缩略图容器（sc-f44a0b30-9 / sc-f44a0b30-9.cvPXKv），
+                // 否则使用之前确定的 container
+                let badgeParent = container;
+                let usingThumbnail = false;
+                try {
+                    const thumb = container.querySelector && (container.querySelector('div.sc-f44a0b30-9.cvPXKv') || container.querySelector('div.sc-f44a0b30-9'));
+                    if (thumb) {
+                        badgeParent = thumb;
+                        usingThumbnail = true;
+                        // 永远输出缩略图选择信息，便于诊断（不依赖 debug 开关）
+                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '检测到缩略图容器，尺寸:', thumb.offsetWidth, 'x', thumb.offsetHeight);
+                    } else {
+                        // 未检测到专用缩略图容器，尝试回退到与 anchor 最近的 img 的父容器
+                        let img = null;
+                        try {
+                            img = (anchor && anchor.querySelector && anchor.querySelector('img')) || container.querySelector('img');
+                        } catch (e) {
+                            img = null;
+                        }
+                        if (img) {
+                            badgeParent = img.parentElement || anchor || container;
+                            usingThumbnail = false; // 虽然以图片为基准，但不是预期的缩略图容器
+                            console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '未找到缩略图容器，回退使用 img 的父元素作为徽章父元素');
+                        } else {
+                            // 最终回退：使用 container 本身
+                            badgeParent = container;
+                            console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '未找到 img，使用 container 作为徽章父元素，container.class:', container.className);
+                        }
+                    }
+                } catch (e) {
+                    console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '选择徽章父元素时出错:', e);
                 }
 
                 const badge = document.createElement('span');
                 badge.className = 'eagle-saved-badge';
                 badge.textContent = '✅';
                 badge.setAttribute('aria-hidden', 'true');
-                // 样式：左下角浮动
+                // 样式：左下角浮动，系列缩略图也适用
                 badge.style.position = 'absolute';
+                // 更保守的偏移，避免与右下角的书签/按钮重叠
                 badge.style.left = '6px';
                 badge.style.bottom = '6px';
                 badge.style.zIndex = '2147483647';
@@ -2357,77 +2091,120 @@ SOFTWARE.
                 badge.style.minWidth = '24px';
                 badge.style.minHeight = '24px';
 
-                container.appendChild(badge);
-                container.dataset.eagleSaved = '1';
+                try {
+                    // 确保 badgeParent 为定位上下文
+                    try {
+                        const cs2 = window.getComputedStyle(badgeParent);
+                        if (!cs2 || cs2.position === 'static') {
+                            badgeParent.style.position = 'relative';
+                        }
+                        // 当使用缩略图作为父元素时，确保 overflow 不会隐藏徽章
+                        if (usingThumbnail) {
+                            badgeParent.style.overflow = 'visible';
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
 
-                if (debug) log('徽章已插入:', matchInfo.artworkId);
+                    badgeParent.appendChild(badge);
+                    // 无论 debug 与否，都记录插入位置与父/徽章的边界，便于诊断定位问题
+                    try {
+                        const parentRect = badgeParent.getBoundingClientRect ? badgeParent.getBoundingClientRect() : null;
+                        const badgeRect = badge.getBoundingClientRect ? badge.getBoundingClientRect() : null;
+                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '徽章已插入，位置:', badgeParent === container ? '主容器' : '缩略图容器', 'parentRect:', parentRect, 'badgeRect:', badgeRect);
+                    } catch (e) {
+                        console.log('[Pixiv2Eagle] 作品', matchInfo.artworkId, '插入徽章后读取 rect 失败:', e);
+                    }
+                    if (debug) log('徽章已插入，位置:', badgeParent === container ? '主容器' : '缩略图容器');
+                    // 在最外层 container 上打标用于去重，避免重复插入
+                    container.dataset.eagleSaved = '1';
+
+                    // 记录该次匹配的信息（持久化以供后续分析）
+                    try {
+                        const record = {
+                            artworkId: matchInfo.artworkId || null,
+                            artworkUrl: matchInfo.artworkUrl || null,
+                            matchedBy: matchInfo.matchedBy || null,
+                            matchedFolderId: matchInfo.matchedFolderId || null,
+                            containerClass: (container.className || '').toString(),
+                            timestamp: Date.now(),
+                            pagePath: location.pathname,
+                        };
+
+                        // 读取已有记录（确保为数组）
+                        let existing = [];
+                        try {
+                            const raw = GM_getValue('eagleSavedBadgeRecords', []);
+                            existing = Array.isArray(raw) ? raw : [];
+                        } catch (e) {
+                            existing = [];
+                        }
+                        existing.push(record);
+                        try {
+                            GM_setValue('eagleSavedBadgeRecords', existing);
+                        } catch (e) {
+                            console.error('保存勾选记录到 GM_setValue 失败:', e);
+                        }
+
+                        if (debug) console.debug('[Pixiv2Eagle] 记录已保存缩略图匹配:', record);
+                    } catch (recErr) {
+                        console.error('记录匹配信息失败:', recErr);
+                    }
+                } catch (e) {
+                    console.error('插入已保存标记失败:', e);
+                }
             };
 
             // 首次批量标注
             console.log('[Pixiv2Eagle] 开始首次批量标注，artworkIds:', artworkIds.length, '个');
             for (const id of artworkIds) {
-                const target = anchorMap[id];
-                // 标记为已检查，防止重复处理（无论是否匹配）
-                if (target.dataset.eagleChecked === '1') continue;
-                target.dataset.eagleChecked = '1';
-
+                const a = anchorMap[id];
                 const artworkUrl = `https://www.pixiv.net/artworks/${id}`;
+                // 匹配优先级：
+                // 1) item.url 与 artworkUrl 匹配 (matchedBy = 'itemUrl')
+                // 2) 画师文件夹（或其子文件夹）中有 folder.description === artworkId (matchedBy = 'folderDesc')
                 if (urlSet.has(artworkUrl)) {
                     console.log('[Pixiv2Eagle] 作品', id, '匹配 (itemUrl)');
-                    insertBadgeToContainer(target, { artworkId: id, artworkUrl, matchedBy: 'itemUrl' });
+                    if (debug) log('标注作品 (itemUrl):', id);
+                    insertBadge(a, { artworkId: id, artworkUrl, matchedBy: 'itemUrl', matchedFolderId: null });
                 } else if (folderDescSet.has(String(id))) {
-                    console.log('[Pixiv2Eagle] 作品', id, '匹配 (folderDesc)');
-                    insertBadgeToContainer(target, { artworkId: id, artworkUrl, matchedBy: 'folderDesc' });
+                    const matchedFolderId = folderDescMap[String(id)] || null;
+                    console.log('[Pixiv2Eagle] 作品', id, '匹配 (folderDesc)，文件夹ID:', matchedFolderId);
+                    if (debug) log('标注作品 (folderDesc):', id, '文件夹ID:', matchedFolderId);
+                    insertBadge(a, { artworkId: id, artworkUrl, matchedBy: 'folderDesc', matchedFolderId });
                 } else {
-                    if (debug) log('未匹配作品:', id);
+                    console.log('[Pixiv2Eagle] 作品', id, '未匹配（不在 urlSet 或 folderDescSet 中）');
+                    if (debug) log('未匹配作品:', id, '(不在 urlSet 或 folderDescSet 中)');
                 }
             }
 
-            // 监听后续动态添加的作品节点
+            // 监听后续动态添加的作品节点（如无限滚动或分页加载）
             currentGalleryObserver = new MutationObserver((mutations) => {
-                let shouldScan = false;
                 for (const mut of mutations) {
-                    if (mut.addedNodes.length > 0) {
-                        shouldScan = true;
-                        break;
-                    }
-                }
-                
-                if (shouldScan && listContainer) {
-                    const lis = listContainer.querySelectorAll('li');
-                    for (const li of lis) {
-                        // 查找目标容器
-                        let target = li.querySelector('div.sc-f44a0b30-9.cvPXKv');
-                        if (!target) target = li.querySelector('div.sc-f44a0b30-9');
-                        
-                        // 如果已经检查过，跳过
-                        if (target && target.dataset.eagleChecked === '1') continue;
-                        
-                        // 提取 PID
-                        const link = li.querySelector('a[href*="/artworks/"]');
-                        if (!link) continue;
-                        const m = link.getAttribute('href').match(/\/artworks\/(\d+)/);
-                        if (!m) continue;
-                        const pid = m[1];
-
-                        if (target) {
-                            target.dataset.eagleChecked = '1'; // 标记为已检查
-                            
-                            const artworkUrl = `https://www.pixiv.net/artworks/${pid}`;
-                            if (urlSet.has(artworkUrl)) {
-                                insertBadgeToContainer(target, { artworkId: pid, artworkUrl, matchedBy: 'itemUrl' });
-                            } else if (folderDescSet.has(String(pid))) {
-                                insertBadgeToContainer(target, { artworkId: pid, artworkUrl, matchedBy: 'folderDesc' });
+                    for (const node of Array.from(mut.addedNodes || [])) {
+                        if (!(node instanceof HTMLElement)) continue;
+                        const newAnchors = node.querySelectorAll
+                            ? Array.from(node.querySelectorAll('a[href^="/artworks/"], a[href*="/artworks/"]'))
+                            : [];
+                        for (const na of newAnchors) {
+                            const href = na.getAttribute('href') || '';
+                            const m = href.match(/\/artworks\/(\d+)/);
+                                if (m) {
+                                const id = m[1];
+                                const artworkUrl = `https://www.pixiv.net/artworks/${id}`;
+                                if (urlSet.has(artworkUrl)) {
+                                    insertBadge(na, { artworkId: id, artworkUrl, matchedBy: 'itemUrl', matchedFolderId: null });
+                                } else if (folderDescSet.has(String(id))) {
+                                    const matchedFolderId = folderDescMap[String(id)] || null;
+                                    insertBadge(na, { artworkId: id, artworkUrl, matchedBy: 'folderDesc', matchedFolderId });
+                                }
                             }
                         }
                     }
                 }
             });
 
-            // 观察 listContainer 或 body
-            const observeTarget = listContainer || document.body;
-            currentGalleryObserver.observe(observeTarget, { childList: true, subtree: true });
-            
+            currentGalleryObserver.observe(searchRoot, { childList: true, subtree: true });
             // 5 分钟后断开监听以避免长期占用
             setTimeout(() => {
                 if (currentGalleryObserver) currentGalleryObserver.disconnect();
@@ -2449,25 +2226,36 @@ SOFTWARE.
 
     let currentRecObserver = null;
     let isRecAreaInitializing = false;
-    let currentRecUrl = ""; // 记录当前监控的 URL，防止重复初始化
 
-    let globalEagleIndex = null;
-    let eagleIndexLoadingPromise = null;
+    // 在推荐区域标记已保存作品
+    async function markSavedInRecommendationArea() {
+        // 如果正在初始化，直接返回，避免重复执行
+        if (isRecAreaInitializing) return;
+        isRecAreaInitializing = true;
 
-    // 异步构建 Eagle 索引 (单例模式)
-    async function ensureEagleIndex() {
-        if (globalEagleIndex) return globalEagleIndex;
-        if (eagleIndexLoadingPromise) return eagleIndexLoadingPromise;
+        try {
+            // 清理旧的 Observer
+            if (currentRecObserver) {
+                currentRecObserver.disconnect();
+                currentRecObserver = null;
+            }
 
-        console.log("[Pixiv2Eagle] 正在构建全局 Eagle 索引...");
-        eagleIndexLoadingPromise = (async () => {
-            const index = new Map();
+            console.log("[Pixiv2Eagle] 开始监控推荐区域 (DOM 结构适配版)...");
+
+            // 1. 构建 Eagle 索引 (ArtistUID -> { folderId, savedPids: Set<string> })
+            // 为了满足"快速寻找"的需求，我们一次性获取文件夹树，并在内存中建立索引
+            const eagleIndex = new Map(); 
+
             const pixivFolderId = getFolderId();
-            if (!pixivFolderId) return index;
+            if (!pixivFolderId) {
+                console.log("[Pixiv2Eagle] 未设置 Pixiv 文件夹 ID，跳过推荐区域标记");
+                return;
+            }
 
             try {
                 const folderList = await gmFetch("http://localhost:41595/api/folder/list");
                 if (folderList.status && Array.isArray(folderList.data)) {
+                    // 辅助：找到 Pixiv 根目录
                     const findFolder = (folders, id) => {
                         for (const f of folders) {
                             if (f.id === id) return f;
@@ -2483,184 +2271,87 @@ SOFTWARE.
                     if (root && root.children) {
                         for (const artistFolder of root.children) {
                             const desc = artistFolder.description || "";
+                            // 匹配备注中的 pid = {UID}
                             const match = desc.match(/pid\s*=\s*(\d+)/);
                             if (match) {
                                 const artistUid = match[1];
                                 const pids = new Set();
                                 
-                                // 递归遍历所有子孙节点查找 PID (支持类型文件夹、系列文件夹等嵌套结构)
-                                const traverse = (nodes) => {
-                                    for (const node of nodes) {
-                                        const subDesc = (node.description || "").trim();
-                                        // 只要备注是纯数字，就认为是作品 PID
-                                        if (subDesc && /^\d+$/.test(subDesc)) {
-                                            pids.add(subDesc);
-                                        }
-                                        // 继续递归子文件夹
-                                        if (node.children && node.children.length > 0) {
-                                            traverse(node.children);
+                                // 收集子文件夹的 PID (description)
+                                // 规则：插画文件夹的备注为插画的pid
+                                if (artistFolder.children) {
+                                    for (const sub of artistFolder.children) {
+                                        if (sub.description && /^\d+$/.test(sub.description.trim())) {
+                                            pids.add(sub.description.trim());
                                         }
                                     }
-                                };
-
-                                if (artistFolder.children) {
-                                    traverse(artistFolder.children);
                                 }
-                                index.set(artistUid, { id: artistFolder.id, pids });
+                                eagleIndex.set(artistUid, { id: artistFolder.id, pids });
                             }
                         }
                     }
-                    console.log(`[Pixiv2Eagle] 全局 Eagle 索引构建完成，包含 ${index.size} 位画师`);
+                    console.log(`[Pixiv2Eagle] Eagle 索引构建完成，包含 ${eagleIndex.size} 位画师`);
                 }
             } catch (e) {
                 console.error("[Pixiv2Eagle] 构建 Eagle 索引失败:", e);
+                return;
             }
-            return index;
-        })();
-
-        try {
-            globalEagleIndex = await eagleIndexLoadingPromise;
-        } catch (e) {
-            console.error(e);
-            eagleIndexLoadingPromise = null; // 允许重试
-        }
-        return globalEagleIndex;
-    }
-
-    // 在推荐区域标记已保存作品
-    async function markSavedInRecommendationArea() {
-        // 如果正在初始化，直接返回，避免重复执行
-        if (isRecAreaInitializing) return;
-        
-        // 如果当前 URL 已经监控过，且 Observer 还在运行，则不重复初始化
-        // 注意：Pixiv 是 SPA，URL 变化时页面内容可能重置，所以通常需要重新 attach
-        // 但如果 URL 没变（例如只是参数变化或重复触发），则跳过
-        if (currentRecUrl === location.href && currentRecObserver) {
-            // console.log("[Pixiv2Eagle] 当前 URL 已在监控推荐区域，跳过重复初始化");
-            return;
-        }
-
-        isRecAreaInitializing = true;
-        currentRecUrl = location.href;
-
-        try {
-            // 清理旧的 Observer
-            if (currentRecObserver) {
-                currentRecObserver.disconnect();
-                currentRecObserver = null;
-            }
-            // 清理旧的 Timer
-            if (window.recScanTimer) {
-                clearInterval(window.recScanTimer);
-                window.recScanTimer = null;
-            }
-            // 清理旧的 Pending Timer
-            if (window.recPendingTimer) {
-                clearInterval(window.recPendingTimer);
-                window.recPendingTimer = null;
-            }
-
-            console.log("[Pixiv2Eagle] 开始监控推荐区域 (全局索引版)...");
-
-            // 立即触发索引构建，但不阻塞后续的 Observer 设置
-            ensureEagleIndex();
-
-            // 待重试队列 (Set<HTMLElement>)
-            const pendingLis = new Set();
 
             // 2. 处理单个 LI 节点的函数
             const processLi = (li) => {
-                if (li.dataset.eagleChecked) {
-                    pendingLis.delete(li); // 已完成，移出队列
-                    return;
-                }
+                if (li.dataset.eagleChecked) return;
+                li.dataset.eagleChecked = "1";
 
                 // 提取作品 PID
-                let titleLink = li.querySelector(REC_WORK_LINK_SELECTOR);
-                if (!titleLink) titleLink = li.querySelector('a[href*="/artworks/"]');
-                
-                if (!titleLink) {
-                    pendingLis.add(li); // 链接未加载，加入重试队列
-                    return; 
-                }
+                // 规则：<a class="sc-fab8f26d-6 hOiByN" ... href="/artworks/138500485">
+                const titleLink = li.querySelector('a[href*="/artworks/"]');
+                if (!titleLink) return;
                 const pidMatch = titleLink.getAttribute("href").match(/\/artworks\/(\d+)/);
-                if (!pidMatch) {
-                    pendingLis.add(li);
-                    return;
-                }
+                if (!pidMatch) return;
                 const pid = pidMatch[1];
 
                 // 提取画师 UID
-                let artistLink = li.querySelector(REC_ARTIST_LINK_SELECTOR);
-                if (!artistLink) artistLink = li.querySelector('a[href*="/users/"]');
-
-                if (!artistLink) {
-                    pendingLis.add(li); // 链接未加载，加入重试队列
-                    return; 
-                }
+                // 规则：<a class="sc-fbe982d0-2 caPKbc" ... href="/users/77697856">
+                const artistLink = li.querySelector('a[href*="/users/"]');
+                if (!artistLink) return;
                 const uidMatch = artistLink.getAttribute("href").match(/\/users\/(\d+)/);
-                if (!uidMatch) {
-                    pendingLis.add(li);
-                    return;
-                }
+                if (!uidMatch) return;
                 const uid = uidMatch[1];
 
-                // 确保索引已就绪
-                if (!globalEagleIndex) {
-                    pendingLis.add(li); // 索引未就绪，加入重试队列
-                    return;
-                }
-
                 // 检查 Eagle 索引
-                const artistData = globalEagleIndex.get(uid);
-                
-                // 情况 1: 画师不在 Eagle 中 -> 肯定未保存 -> 标记为已检查
-                if (!artistData) {
-                    console.log(`[Pixiv2Eagle] 作品 ${pid}: 画师 ${uid} 不在 Eagle 中 -> 未保存`);
-                    li.dataset.eagleChecked = "1";
-                    pendingLis.delete(li);
-                    return;
-                }
+                const artistData = eagleIndex.get(uid);
+                if (!artistData) return;
 
-                // 情况 2: 画师在 Eagle 中，检查作品 PID
+                // 检查是否已保存 (检查子文件夹 PID)
                 if (artistData.pids.has(pid)) {
-                    const success = addBadge(li, pid);
-                    if (success) {
-                        li.dataset.eagleChecked = "1"; // 标记成功才设为 checked
-                        pendingLis.delete(li);
-                        console.log(`[Pixiv2Eagle] 作品 ${pid}: 已保存 (画师 ${uid}) -> 标记成功`);
-                    } else {
-                        // 标记失败（如找不到容器），加入重试队列
-                        console.log(`[Pixiv2Eagle] 作品 ${pid}: 已保存 (画师 ${uid}) -> 标记失败 (找不到容器)，加入重试`);
-                        pendingLis.add(li);
-                    }
-                } else {
-                    // 情况 3: 作品未保存 -> 标记为已检查
-                    console.log(`[Pixiv2Eagle] 作品 ${pid}: 画师 ${uid} 在 Eagle 中，但作品未保存`);
-                    li.dataset.eagleChecked = "1";
-                    pendingLis.delete(li);
+                    console.log(`[Pixiv2Eagle] 推荐区域发现已保存作品: ${pid} (画师 ${uid})`);
+                    addBadge(li, pid);
                 }
             };
 
             // 3. 添加标记函数
             const addBadge = (li, pid) => {
                 // 寻找缩略图容器
-                let target = li.querySelector(REC_THUMBNAIL_SELECTOR);
-                if (!target) target = li.querySelector('div.sc-f44a0b30-9');
+                // 规则：<div radius="4" class="sc-f44a0b30-9 cvPXKv">
+                let target = li.querySelector('div.sc-f44a0b30-9.cvPXKv');
                 
-                // 备选容器
-                if (!target) target = li.querySelector(REC_THUMBNAIL_FALLBACK_SELECTOR);
-                if (!target) target = li.querySelector('div.sc-fab8f26d-3');
-
-                // 图片容器回退
+                // 如果没找到，尝试找不带 cvPXKv 的
                 if (!target) {
-                    const img = li.querySelector('img');
-                    if (img) target = img.parentElement;
+                    target = li.querySelector('div.sc-f44a0b30-9');
                 }
 
-                if (!target) return false;
+                // 如果在这个div上插入标记失败（或没找到），则允许向上尝试3层div
+                // 这里的逻辑是：如果首选容器不存在，我们尝试找它的父级容器，直到找到最上层的 sc-fab8f26d-3 etVILu
+                // 但由于我们是从 li 向下找，如果找不到 sc-f44a0b30-9，说明结构可能变了，或者我们应该直接找 sc-fab8f26d-3
+                if (!target) {
+                    // 备选容器：<div class="sc-fab8f26d-3 etVILu">
+                    target = li.querySelector('div.sc-fab8f26d-3.etVILu');
+                }
 
-                if (target.querySelector('.eagle-saved-badge')) return true;
+                if (!target) return;
+
+                // 插入标记
+                if (target.querySelector('.eagle-saved-badge')) return;
 
                 const badge = document.createElement('span');
                 badge.className = 'eagle-saved-badge';
@@ -2678,50 +2369,27 @@ SOFTWARE.
                 badge.style.borderRadius = '4px';
                 badge.style.fontWeight = 'bold';
                 
+                // 确保定位
                 const style = window.getComputedStyle(target);
                 if (style.position === 'static') {
                     target.style.position = 'relative';
                 }
                 target.appendChild(badge);
-                return true;
             };
 
             // 4. 扫描逻辑
             const scan = () => {
-                // 如果索引还没好，先不处理，等待下一次 Timer
-                if (!globalEagleIndex) return;
+                // 推荐作品区域为：<section class="sc-79c00fd3-0 fbGJOF">
+                const section = document.querySelector('section.sc-79c00fd3-0.fbGJOF');
+                if (!section) return;
 
-                let lis = [];
-                
-                // 方案 A: 查找 Section 或新的容器
-                // 2024-12-23: Pixiv 更新，推荐作品容器变为 div.sc-bf8cea3f-0.dKbaFf
-                const containers = document.querySelectorAll(`${REC_SECTION_SELECTOR}, ${REC_CONTAINER_SELECTOR}`);
-                if (containers.length > 0) {
-                    containers.forEach(container => {
-                        container.querySelectorAll('li').forEach(li => lis.push(li));
-                    });
-                }
-                
-                // 方案 B: 回退查找
-                if (!lis || lis.length === 0) {
-                    const links = document.querySelectorAll(REC_WORK_LINK_SELECTOR);
-                    if (links.length > 0) {
-                        const liSet = new Set();
-                        links.forEach(a => {
-                            const li = a.closest('li');
-                            if (li) liSet.add(li);
-                        });
-                        lis = Array.from(liSet);
-                    }
-                }
-
-                if (lis.length > 0) {
-                    // console.log(`[Pixiv2Eagle] 扫描发现 ${lis.length} 个条目`);
-                    lis.forEach(processLi);
-                }
+                // 推荐作品区域内采用ul、li的表格结构
+                const lis = section.querySelectorAll('li');
+                lis.forEach(processLi);
             };
 
-            // 5. 启动 Observer 和 Timer
+            // 5. 启动 Observer
+            // 监听 body 或 main，检测 section 的出现或 li 的增加
             const observer = new MutationObserver((mutations) => {
                 let shouldScan = false;
                 for (const mut of mutations) {
@@ -2730,499 +2398,20 @@ SOFTWARE.
                         break;
                     }
                 }
-                if (shouldScan) {
-                    console.log("[Pixiv2Eagle] 推荐区域检测到新内容，触发扫描...");
-                    scan();
-                }
+                if (shouldScan) scan();
             });
 
             const targetRoot = document.querySelector('main') || document.body;
             observer.observe(targetRoot, { childList: true, subtree: true });
             currentRecObserver = observer;
 
-            // 主定时器：扫描新元素 (2秒一次)
-            window.recScanTimer = setInterval(scan, 2000);
-
-            // 重试定时器：高频扫描待处理队列 (200毫秒一次)
-            window.recPendingTimer = setInterval(() => {
-                if (pendingLis.size > 0) {
-                    // console.log(`[Pixiv2Eagle] 重试 ${pendingLis.size} 个待处理条目...`);
-                    // 复制一份进行遍历，避免遍历时修改 Set 导致问题
-                    const items = Array.from(pendingLis);
-                    items.forEach(processLi);
-                }
-            }, 200);
-
-            // 初始尝试
+            // 初始扫描
             scan();
 
         } catch (err) {
             console.error("[Pixiv2Eagle] 推荐区域监控出错:", err);
         } finally {
             isRecAreaInitializing = false;
-        }
-    }
-
-    // 获取小说 ID
-    function getNovelId() {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get("id");
-    }
-
-    // 获取小说详细信息
-    async function getNovelDetails(novelId) {
-        try {
-            // 标题
-            const titleEl = document.querySelector(NOVEL_TITLE_SELECTOR);
-            const title = titleEl ? titleEl.textContent.trim() : `Novel_${novelId}`;
-
-            // 简介
-            const descEl = document.querySelector(NOVEL_DESC_SELECTOR);
-            const description = descEl ? descEl.textContent.trim() : "";
-
-            // 封面
-            const coverImg = document.querySelector(NOVEL_COVER_SELECTOR);
-            const coverUrl = coverImg ? coverImg.src : null;
-
-            // 作者
-            const authorLink = document.querySelector(NOVEL_AUTHOR_LINK_SELECTOR);
-            const authorId = authorLink ? authorLink.getAttribute("data-gtm-value") : null;
-            const authorName = authorLink ? authorLink.textContent.trim() : "Unknown";
-
-            // 系列信息
-            const seriesSection = document.querySelector(NOVEL_SERIES_SECTION_SELECTOR);
-            let seriesId = null;
-            let seriesTitle = null;
-            
-            if (seriesSection) {
-                const seriesLink = document.querySelector(NOVEL_SERIES_LINK_SELECTOR);
-                if (seriesLink) {
-                    const match = seriesLink.getAttribute("href").match(/\/novel\/series\/(\d+)/);
-                    if (match) {
-                        seriesId = match[1];
-                        seriesTitle = seriesLink.textContent.trim();
-                    }
-                }
-            }
-
-            // 内容
-            const contentContainer = document.querySelector(NOVEL_CONTENT_SELECTOR);
-            let content = "";
-            if (contentContainer) {
-                const paragraphs = Array.from(contentContainer.querySelectorAll("p"));
-                content = paragraphs.map(p => p.textContent).join("\n");
-            }
-
-            return {
-                id: novelId,
-                title,
-                description,
-                coverUrl,
-                authorId,
-                authorName,
-                seriesId,
-                seriesTitle,
-                content,
-                illustType: "novel"
-            };
-        } catch (error) {
-            console.error("获取小说信息失败:", error);
-            throw error;
-        }
-    }
-
-    // 保存当前小说到 Eagle
-    async function saveCurrentNovel() {
-        const folderId = getFolderId();
-        const folderInfo = folderId ? `Pixiv 文件夹 ID: ${folderId}` : "未设置 Pixiv 文件夹 ID";
-
-        const eagleStatus = await checkEagle();
-        if (!eagleStatus.running) {
-            showMessage(`${folderInfo}\nEagle 未启动，请先启动 Eagle 应用！`, true);
-            return;
-        }
-
-        const novelId = getNovelId();
-        if (!novelId) {
-            showMessage("无法获取小说 ID", true);
-            return;
-        }
-
-        try {
-            const details = await getNovelDetails(novelId);
-            if (!details.authorId) {
-                throw new Error("无法获取作者信息");
-            }
-
-            // 1. 获取/创建画师文件夹
-            const artistFolder = await getArtistFolder(folderId, details.authorId, details.authorName);
-            let targetParentId = artistFolder.id;
-            let parentFolderObj = artistFolder;
-
-            // 2. 处理按类型保存 (小说文件夹)
-            if (getSaveByType()) {
-                const typeInfo = getTypeFolderInfo("novel");
-                const typeFolder = await getOrCreateTypeFolder(artistFolder, typeInfo);
-                if (typeFolder) {
-                    targetParentId = typeFolder.id;
-                    parentFolderObj = typeFolder;
-                }
-            }
-
-            // 3. 处理系列文件夹
-            if (details.seriesId) {
-                const seriesUrl = `https://www.pixiv.net/novel/series/${details.seriesId}`;
-                let seriesFolderId = null;
-                
-                // 在父文件夹中查找
-                if (parentFolderObj && parentFolderObj.children) {
-                    const existingSeries = parentFolderObj.children.find(c => c.description === seriesUrl);
-                    if (existingSeries) {
-                        seriesFolderId = existingSeries.id;
-                        parentFolderObj = existingSeries;
-                    }
-                }
-                
-                if (!seriesFolderId) {
-                    seriesFolderId = await createEagleFolder(details.seriesTitle, targetParentId, seriesUrl);
-                    if (parentFolderObj && parentFolderObj.children) {
-                        const newSeriesObj = { id: seriesFolderId, name: details.seriesTitle, description: seriesUrl, children: [] };
-                        parentFolderObj.children.push(newSeriesObj);
-                        parentFolderObj = newSeriesObj;
-                    }
-                }
-                targetParentId = seriesFolderId;
-            }
-
-            // 4. 创建小说章节文件夹
-            const chapterFolderId = await createEagleFolder(details.title, targetParentId, details.id);
-
-            // 5. 保存内容
-            // 5.1 封面
-            if (details.coverUrl) {
-                await gmFetch("http://localhost:41595/api/item/addFromURLs", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        items: [{
-                            url: details.coverUrl,
-                            name: "cover.jpg",
-                            website: `https://www.pixiv.net/novel/show.php?id=${details.id}`,
-                            tags: [],
-                            headers: { referer: "https://www.pixiv.net/" }
-                        }],
-                        folderId: chapterFolderId
-                    })
-                });
-            }
-
-            // 5.2 简介
-            if (details.description) {
-                const descBlob = new Blob([details.description], { type: "text/plain" });
-                const descDataUrl = await blobToDataURL(descBlob);
-                const base64 = descDataUrl.split(",")[1];
-                
-                await gmFetch("http://localhost:41595/api/item/add", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        name: "简介",
-                        ext: "txt",
-                        base64: base64,
-                        website: `https://www.pixiv.net/novel/show.php?id=${details.id}`,
-                        annotation: details.id,
-                        tags: [],
-                        folderId: chapterFolderId
-                    })
-                });
-            }
-
-            // 5.3 正文
-            if (details.content) {
-                const contentBlob = new Blob([details.content], { type: "text/plain" });
-                const contentDataUrl = await blobToDataURL(contentBlob);
-                const base64 = contentDataUrl.split(",")[1];
-                const safeTitle = details.title.replace(/[\\/:*?"<>|]/g, "_");
-                
-                await gmFetch("http://localhost:41595/api/item/add", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        name: safeTitle,
-                        ext: "txt",
-                        base64: base64,
-                        website: `https://www.pixiv.net/novel/show.php?id=${details.id}`,
-                        annotation: details.id,
-                        tags: [],
-                        folderId: chapterFolderId
-                    })
-                });
-            }
-
-            showMessage(`✅ 小说 "${details.title}" 已保存到 Eagle`);
-            
-            // 更新按钮状态
-            const saveButton = document.querySelector(`#${EAGLE_SAVE_BUTTON_ID} div:last-child`);
-            if (saveButton) {
-                saveButton.textContent = "已保存";
-                updateNovelSaveButtonIfSaved(saveButton);
-            }
-
-        } catch (error) {
-            console.error(error);
-            showMessage(`保存小说失败: ${error.message}`, true);
-        }
-    }
-
-    // 更新小说保存按钮状态
-    async function updateNovelSaveButtonIfSaved(saveButton) {
-        const novelId = getNovelId();
-        if (!novelId) return;
-
-        try {
-            const details = await getNovelDetails(novelId);
-            if (!details.authorId) return;
-
-            // 1. 查找画师文件夹
-            let artistFolder = null;
-            try {
-                artistFolder = await findArtistFolder(getFolderId(), details.authorId);
-            } catch (e) {
-                console.warn("[Pixiv2Eagle] 查找画师文件夹失败 (可能是 Pixiv 文件夹 ID 设置错误或文件夹不存在):", e);
-                return; // 忽略错误，不更新按钮状态
-            }
-            
-            if (!artistFolder) return;
-
-            let searchRoots = [artistFolder];
-
-            // 2. 如果开启了按类型保存，也要检查类型文件夹
-            if (getSaveByType()) {
-                const typeInfo = getTypeFolderInfo("novel");
-                if (artistFolder.children) {
-                    const typeFolder = artistFolder.children.find(c => c.description === typeInfo.description);
-                    if (typeFolder) {
-                        searchRoots.push(typeFolder);
-                    }
-                }
-            }
-
-            // 3. 如果有系列，检查系列文件夹
-            if (details.seriesId) {
-                const seriesUrl = `https://www.pixiv.net/novel/series/${details.seriesId}`;
-                let seriesFolders = [];
-                
-                for (const root of searchRoots) {
-                    if (root.children) {
-                        const sFolder = root.children.find(c => c.description === seriesUrl);
-                        if (sFolder) seriesFolders.push(sFolder);
-                    }
-                }
-                
-                if (seriesFolders.length > 0) {
-                    searchRoots = seriesFolders;
-                }
-            }
-
-            // 4. 在搜索根中查找章节文件夹 (description == novelId)
-            let foundFolder = null;
-            for (const root of searchRoots) {
-                if (root.children) {
-                    const chapter = root.children.find(c => c.description === novelId);
-                    if (chapter) {
-                        foundFolder = chapter;
-                        break;
-                    }
-                }
-            }
-
-            if (foundFolder) {
-                saveButton.textContent = "已保存";
-                saveButton.style.backgroundColor = "#4caf50"; // Green
-                saveButton.onclick = (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    gmFetch("http://localhost:41595/api/folder/activate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ folderId: foundFolder.id })
-                    });
-                };
-            }
-
-        } catch (err) {
-            console.error("Check saved status failed:", err);
-        }
-    }
-
-    // 添加小说页面的保存按钮
-    async function addNovelButton() {
-        const oldWrapper = document.getElementById(EAGLE_SAVE_BUTTON_ID);
-        if (oldWrapper) return;
-
-        const targetSection = await waitForElement(NOVEL_BUTTON_SECTION_SELECTOR);
-        if (!targetSection) return;
-
-        // 双重检查，防止在等待过程中重复创建
-        if (document.getElementById(EAGLE_SAVE_BUTTON_ID)) return;
-
-        const buttonWrapper = document.createElement("div");
-        buttonWrapper.id = EAGLE_SAVE_BUTTON_ID;
-        buttonWrapper.style.display = "flex";
-        buttonWrapper.style.alignItems = "center";
-        buttonWrapper.style.justifyContent = "center";
-        buttonWrapper.style.gap = "8px";
-        buttonWrapper.style.marginTop = "16px";
-
-        const saveButton = createPixivStyledButton("保存到 Eagle");
-        saveButton.addEventListener("click", saveCurrentNovel);
-
-        buttonWrapper.appendChild(saveButton);
-        targetSection.appendChild(buttonWrapper);
-
-        // 自动检测是否已保存
-        if (getAutoCheckSavedStatus()) {
-            updateNovelSaveButtonIfSaved(saveButton);
-        }
-    }
-
-    // 在小说系列页面标记已保存章节
-    async function markSavedInNovelSeries() {
-        const listContainer = await waitForElement(NOVEL_SERIES_LIST_SELECTOR);
-        if (!listContainer) return;
-        
-        const seriesIdMatch = location.pathname.match(/\/novel\/series\/(\d+)/);
-        const seriesId = seriesIdMatch ? seriesIdMatch[1] : null;
-        if (!seriesId) return;
-        
-        const authorLink = document.querySelector(NOVEL_SERIES_AUTHOR_LINK_SELECTOR);
-        const authorId = authorLink ? authorLink.getAttribute("data-gtm-user-id") : null;
-        if (!authorId) return;
-        
-        const pixivFolderId = getFolderId();
-        const artistFolder = await findArtistFolder(pixivFolderId, authorId);
-        if (!artistFolder) return;
-        
-        let seriesFolder = findSeriesFolderInArtist(artistFolder, authorId, seriesId);
-        
-        if (!seriesFolder && artistFolder.children) {
-            const novelFolder = artistFolder.children.find(c => c.description === 'novels');
-            if (novelFolder) {
-                seriesFolder = findSeriesFolderInArtist(novelFolder, authorId, seriesId);
-            }
-        }
-        
-        if (!seriesFolder) return;
-        
-        const chapterFolders = seriesFolder.children || [];
-        const savedChapterIds = new Set(chapterFolders.map(c => c.description));
-        
-        const lis = listContainer.querySelectorAll('li');
-        for (const li of lis) {
-            const link = li.querySelector(NOVEL_CHAPTER_LINK_SELECTOR);
-            if (!link) continue;
-            
-            const novelId = link.getAttribute('data-gtm-value');
-            if (savedChapterIds.has(novelId)) {
-                const targetContainer = li.querySelector(NOVEL_CHAPTER_BADGE_CONTAINER_SELECTOR);
-                if (targetContainer) {
-                    if (targetContainer.querySelector('.eagle-saved-mark')) continue;
-                    
-                    const refButton = targetContainer.querySelector(NOVEL_CHAPTER_REF_BUTTON_SELECTOR);
-                    
-                    const mark = document.createElement('span');
-                    mark.className = 'eagle-saved-mark';
-                    mark.textContent = '✅';
-                    mark.style.marginRight = '8px';
-                    mark.title = '已保存到 Eagle';
-                    
-                    if (refButton) {
-                        targetContainer.insertBefore(mark, refButton);
-                    } else {
-                        targetContainer.appendChild(mark);
-                    }
-                }
-            }
-        }
-    }
-
-    // 在作品详情页添加"移动到子文件夹"按钮
-    async function addMoveToSubfolderButton() {
-        const artworkId = getArtworkId();
-        if (!artworkId) return;
-
-        try {
-            // 1. 检查"多页作品创建子文件夹"设置
-            const createSubFolderMode = getCreateSubFolder();
-            /*
-            if (createSubFolderMode === 'off') {
-                console.log('[Pixiv2Eagle] 子文件夹功能未启用，不显示按钮');
-                return;
-            }
-            */
-
-            // 2. 检查是否已保存
-            const savedInfo = await findSavedFolderForArtwork(artworkId);
-            /*
-            if (!savedInfo || !savedInfo.folder) {
-                console.log('[Pixiv2Eagle] 作品未保存，不显示按钮');
-                return;
-            }
-            */
-
-            // 3. 查找按钮容器（等待 DOM 加载）
-            await new Promise(resolve => setTimeout(resolve, 500)); // 等待页面完全加载
-            const container = document.querySelector(ARTWORK_BUTTON_CONTAINER_SELECTOR);
-            const refButton = document.querySelector(ARTWORK_BUTTON_REF_SELECTOR);
-            
-            if (!container) {
-                console.log('[Pixiv2Eagle] 未找到按钮容器:', ARTWORK_BUTTON_CONTAINER_SELECTOR);
-                console.log('[Pixiv2Eagle] 尝试查找所有可能的容器...');
-                const allDivs = document.querySelectorAll('div[class*="sc-7fd477ff"]');
-                console.log('[Pixiv2Eagle] 找到的相关容器:', allDivs.length);
-                allDivs.forEach((div, idx) => {
-                    console.log(`[Pixiv2Eagle] 容器 ${idx}:`, div.className);
-                });
-                return;
-            }
-
-            if (!refButton) {
-                console.log('[Pixiv2Eagle] 未找到参考按钮:', ARTWORK_BUTTON_REF_SELECTOR);
-                console.log('[Pixiv2Eagle] 容器内所有子元素:');
-                Array.from(container.children).forEach((child, idx) => {
-                    console.log(`[Pixiv2Eagle] 子元素 ${idx}:`, child.className, child.tagName);
-                });
-            }
-
-            // 4. 避免重复添加
-            if (document.getElementById('eagle-move-to-subfolder-btn')) {
-                console.log('[Pixiv2Eagle] 按钮已存在');
-                return;
-            }
-
-            // 5. 创建按钮
-            const btn = createPixivStyledButton("更新系列漫画至序列文件夹");
-            btn.id = 'eagle-move-to-subfolder-btn';
-            btn.style.marginLeft = '8px';
-            btn.onclick = async () => {
-                btn.textContent = '正在移动...';
-                btn.style.pointerEvents = 'none';
-                await moveArtworkToSubfolder(artworkId);
-                btn.textContent = '更新系列漫画至序列文件夹';
-                btn.style.pointerEvents = 'auto';
-            };
-
-            // 6. 插入按钮
-            if (refButton) {
-                container.insertBefore(btn, refButton);
-            } else {
-                // 如果没有参考按钮，直接添加到容器末尾
-                container.appendChild(btn);
-            }
-            console.log('[Pixiv2Eagle] ✅ 成功添加"移动到子文件夹"按钮');
-
-        } catch (error) {
-            console.error('[Pixiv2Eagle] ❌ 添加"移动到子文件夹"按钮失败:', error);
         }
     }
 
@@ -3282,9 +2471,6 @@ SOFTWARE.
 
         // 自动检测是否已保存，已保存则更新按钮文本
         if (getAutoCheckSavedStatus()) updateSaveButtonIfSaved(saveButton);
-
-        // 添加"移动到子文件夹"按钮（如果适用）
-        addMoveToSubfolderButton();
     }
 
     const monitorConfig = [
@@ -3297,20 +2483,6 @@ SOFTWARE.
             },
         },
         {
-            urlSuffix: "/novel/show.php",
-            observeID: EAGLE_SAVE_BUTTON_ID,
-            handler: () => {
-                addNovelButton();
-            }
-        },
-        {
-            urlSuffix: "/novel/series",
-            observeID: null,
-            handler: () => {
-                markSavedInNovelSeries();
-            }
-        },
-        {
             urlSuffix: "/user",
             observeID: null,
             handler: debouncedMarkSavedInArtistList,
@@ -3320,10 +2492,6 @@ SOFTWARE.
     // 启动脚本
     try {
         console.log('[Pixiv2Eagle] 脚本已启动，当前URL:', location.pathname);
-        
-        // 立即开始构建全局索引
-        ensureEagleIndex();
-
         for (const monitorInfo of monitorConfig) {
             if (location.pathname.includes(monitorInfo.urlSuffix)) {
                 console.log('[Pixiv2Eagle] 初始加载时触发处理器:', monitorInfo.urlSuffix);
