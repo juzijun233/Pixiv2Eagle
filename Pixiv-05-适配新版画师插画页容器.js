@@ -670,7 +670,15 @@ SOFTWARE.
         try {
             const details = await getArtworkDetails(artworkId);
             const pixivFolderId = getFolderId();
-            const artistFolder = await findArtistFolder(pixivFolderId, details.userId);
+            
+            let artistFolder = null;
+            try {
+                artistFolder = await findArtistFolder(pixivFolderId, details.userId);
+            } catch (e) {
+                console.error("[Pixiv2Eagle] findArtistFolder 调用失败:", e);
+                return null;
+            }
+            
             if (!artistFolder) return null;
 
             // 检查当前页面是否为漫画系列（通过"加入追更列表"按钮判断）
